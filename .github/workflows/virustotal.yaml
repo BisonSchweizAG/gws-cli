@@ -1,0 +1,49 @@
+name: Scan GitHub Release with VirusTotal
+
+on:
+  release:
+    types: [released]
+  schedule:
+    - cron: '15 22 * * *'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to scan (optional, defaults to latest)'
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Release tag to scan (optional, defaults to latest)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      VT_API_KEY:
+        required: true
+
+jobs:
+  scan_release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Get Latest Release Tag
+        id: latest_release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_TAG=${{ inputs.release_tag }}
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG=${{ github.event.release.tag_name }}
+          fi
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
+          fi
+          echo "tag_name=$RELEASE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Analyze Build Assets
+        uses: bakito/virustotal-action@979bbbb7d7918b4d558dc729bd4156185f1d1688 # V1.0.5
+        with:
+          release_name: ${{ steps.latest_release.outputs.tag_name }}
+          vt_api_key: ${{secrets.VT_API_KEY}}

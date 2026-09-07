@@ -1,0 +1,11 @@
+gws
+gws.exe
+bin
+dist
+coverage.out
+sign
+
+.gws.yaml
+*.syso
+
+testdata/auth

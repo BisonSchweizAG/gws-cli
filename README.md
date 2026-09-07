@@ -1,0 +1,130 @@
+<div align="center">
+  <img src="icon/icon.svg" alt="GWS Icon" width="100"/>
+</div>
+
+# gws - Google Cloud Workstation CLI
+
+A command-line tool to manage Google Cloud Workstations.
+
+## Description
+
+`gws` is a utility to simplify the management of Google Cloud Workstations. It provides commands to start, stop, and
+connect to your workstation, as well as manage your configuration.
+
+## Installation
+
+You can install `gws` by downloading a binary from
+the [latest release]( https://github.com/bisonschweizag/gws-cli/releases/tag/v0.2.0) or via go by using `go install`:
+
+A command-line tool to manage Google Cloud Workstations.
+
+## Description
+
+`gws` is a utility to simplify the management of Google Cloud Workstations. It provides commands to start, stop, and connect to your workstation, as well as manage your configuration.
+
+## Installation
+
+You can install `gws` by downloading a binary from the [latest release]( https://github.com/bisonschweizag/gws-cli/releases/tag/v0.2.0) or via go by using `go install`:
+
+```bash
+go install github.com/bisonschweizag/gws-cli@latest
+```
+
+## Usage
+
+### Commands
+
+- `gws setup`: Create a new or update the config.yaml and create a context configuration using an interactive terminal setup wizard.
+- `gws start [context]`: Start the workstation for the given or current context.
+- `gws stop [context]`: Stop the workstation for the given or current context.
+- `gws restart [context]`: Restart the workstation for the given or current context.
+- `gws status`: List all configured workstations with their state.
+- `gws up`: Uploads files and directories to the workstation as defined in the context configuration.
+- `gws down`: Download files and directories from the workstation as defined in the context configuration.
+- `gws tunnel [context]`: Create an SSH tunnel to the workstation.
+- `gws ctx [context]`: Switch the current context. If no context is provided, an interactive selection is shown.
+  - `--current`: Print the current active context.
+- `gws scripts win-reconnect-ssh`: Generate a Windows SSH reconnect script.
+- `gws scripts bash-reconnect-ssh`: Generate a Bash SSH reconnect script.
+
+### Global Flags
+
+- `--config`: Path to the configuration file (default: `~/.config/gws/config.yaml`).
+- `--ctx`: The context to use.
+
+## Configuration
+
+`gws` is configured using a YAML file (default: `~/.config/gws/config.yaml`). You can use the `gws setup` command to create an initial configuration.
+
+The configuration file can contain multiple contexts. Each context defines the connection details for a specific workstation.
+
+### `config.yaml` example
+
+```yaml
+currentContext: my-workstation
+contexts:
+  my-workstation:
+    host: localhost
+    port: 2222
+    user: user
+    privateKeyFile: /path/to/your/private/key
+    knownHostsFile: /path/to/your/known_hosts
+    postConnectCommand: # open 'GWS' profile in a new Windows Terminal Tab
+     - 'wt'
+     - '--window=0'
+     - '--profile=GWS'
+    gcloud:
+      project: my-project
+      account: user@example.com
+      region: a-region
+      cluster: my-cluster
+      config: my-workstation-config
+      name: my-workstation
+    dirs:
+    - path: /home/user/.ssh
+      permissions: "0700"
+    files:
+    - sourcePath: /path/to/your/file
+      path: /home/user/file
+      permissions: "0644"
+      direction: up
+chromeBrowser:
+  executablePath: C:\Program Files\Google\Chrome\Application\chrome.exe
+  profileDirectory: Profile X
+jetbrainsGateway:
+  downloadDestination: C:\workspace\Jetbrains-Programs\JetBrainsClientDist
+```
+
+### Configuration Options
+
+- `currentContext`: The name of the currently active context.
+- `contexts`: A map of contexts.
+  - `<context-name>`:
+    - `host`: The hostname or IP address of the workstation.
+    - `port`: The port to connect to.
+    - `user`: The username to use for the SSH connection.
+    - `privateKeyFile`: The path to the private key for the SSH connection.
+    - `knownHostsFile`: The path to the known hosts file for the SSH connection.
+    - `postConnectCommand`: Optional command and arguments to start after the tunnel is opened. The first item is the executable, and the remaining items are passed as arguments.
+    - `gcloud`: The Google Cloud configuration.
+      - `project`: The Google Cloud project.
+      - `account`: The Google Cloud account (email, optional).
+      - `region`: The Google Cloud region.
+      - `cluster`: The Google Cloud cluster.
+      - `config`: The workstation configuration.
+      - `name`: The name of the workstation.
+    - `dirs`: A list of directories to create on the workstation.
+      - `path`: The path of the directory.
+      - `permissions`: The permissions of the directory.
+    - `files`: A list of files to upload to the workstation.
+      - `sourcePath`: The path of the local file.
+      - `path`: The path of the remote file.
+      - `permissions`: The permissions of the remote file.
+      - `direction`: The direction (up / down) the file is copied.
+- `sshTimeoutSeconds`: Optional SSH connection timeout in seconds (default: `30`).
+- `startTimeoutSeconds`: Optional workstation start timeout in seconds (default: `300`).
+- `chromeBrowser`: Optional Chrome browser configuration.
+  - `executablePath`: The path to the Chrome executable.
+  - `profileDirectory`: The Chrome profile directory to use. (check profile dir by opening `chrome://version` in chrome)
+- `jetbrainsGateway`: Optional JetBrains Gateway configuration.
+  - `downloadDestination`: The directory where JetBrains programs are downloaded.
