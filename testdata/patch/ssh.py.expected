@@ -1,0 +1,10 @@
+  @classmethod
+  def Current(cls):
+    """Retrieve the current environment.
+
+    Returns:
+      Environment, the active and current environment on this machine.
+    """
+    suite = Suite.OPENSSH
+    bin_path = None
+    return Environment(suite, bin_path)

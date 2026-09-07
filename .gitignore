@@ -1,0 +1,13 @@
+gws
+gws.exe
+bin
+dist
+coverage.out
+
+.gws-token.json
+.gws.yaml
+licenses
+licenses.csv
+licenses.md
+
+testdata/auth
