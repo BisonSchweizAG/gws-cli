@@ -1,0 +1,61 @@
+version: 2
+project_name: gws
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    - |
+      sh -c 'if [[ -n "${CERT_PFX}" ]]; then
+        mkdir -p sign
+        echo "${CERT_PFX}" | base64 -d > sign/cert.pfx
+      fi'
+builds:
+  - binary: gws
+    env:
+      - CGO_ENABLED=0
+    hooks:
+      pre:
+        - goversioninfo -platform-specific=true -icon=icon/icon.ico -skip-versioninfo=true
+      post:
+        - |
+          sh -c 'if [ "{{ .Os }}" = "windows" ]; then 
+            osslsigncode sign -pkcs12 sign/cert.pfx -pass "{{ .Env.CERT_PASSWORD }}" -n "{{ .ProjectName }}" -i "https://example.com" -h sha256 -t "http://timestamp.digicert.com" -in "{{ .Path }}" -out "{{ .Path }}.signed"
+            mv "{{ .Path }}.signed" "{{ .Path }}"
+          fi'
+    ldflags:
+      - -s -w
+      - -X github.com/bisonschweizag/gws-cli/version.Version=v{{.Version}}
+      - -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientID={{.Env.GOOGLE_OIDC_CLIENT_ID}}
+      - -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientSecret={{.Env.GOOGLE_OIDC_CLIENT_SECRET}}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  version_template: "{{ .Tag }}-next"
+sboms:
+  - artifacts: archive
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore'
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE
+      - README.md

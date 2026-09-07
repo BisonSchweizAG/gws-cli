@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'New tag name (e.g. v1.2.3)'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Create tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TAG_NAME=${{ github.event.inputs.tag_name }}
+          if [[ ! $TAG_NAME =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid tag name: $TAG_NAME. Must follow v[0-9]+.[0-9]+.[0-9]+ format."
+            exit 1
+          fi
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+            echo "::error::Tag $TAG_NAME already exists on remote."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+
+      - name: Install osslsigncode
+        run: sudo apt-get update && sudo apt-get install -y osslsigncode
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Cache binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: bin
+          key: release-${{ runner.os }}-bin-${{ hashFiles('.toolbox.mk') }}
+
+      - name: Release
+        run: make release-ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_OIDC_CLIENT_ID: ${{ secrets.GOOGLE_OIDC_CLIENT_ID }}
+          GOOGLE_OIDC_CLIENT_SECRET: ${{ secrets.GOOGLE_OIDC_CLIENT_SECRET }}
+
+  virustotal:
+    needs: release
+    uses: ./.github/workflows/virustotal.yaml
+    with:
+      release_tag: ${{ github.event.inputs.tag_name || github.ref_name }}
+    secrets:
+      VT_API_KEY: ${{ secrets.VT_API_KEY }}
