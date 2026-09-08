@@ -7,6 +7,28 @@ import (
 	"cloud.google.com/go/workstations/apiv1/workstationspb"
 )
 
+func Test_formatContext(t *testing.T) {
+	tests := []struct {
+		name     string
+		ctx      string
+		current  string
+		expected string
+	}{
+		{"matching context", "my-context", "my-context", "my-context ✅"},
+		{"different context", "other-context", "my-context", "other-context"},
+		{"empty current context", "my-context", "", "my-context"},
+		{"empty both", "", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatContext(tt.ctx, tt.current); got != tt.expected {
+				t.Errorf("formatContext() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
 func Test_formatState(t *testing.T) {
 	tests := []struct {
 		state    workstationspb.Workstation_State
