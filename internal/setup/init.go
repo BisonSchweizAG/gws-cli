@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/filepicker"
 	"charm.land/bubbles/v2/textinput"
 
+	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
@@ -29,6 +30,24 @@ func InitialModel(cfg *types.Config) Model {
 	fis := m.FilterInput.Styles()
 	fis.Cursor.Color = m.Styles.InputFocused.GetForeground()
 	m.FilterInput.SetStyles(fis)
+
+	if m.Config.NoBrowser {
+		ac := textinput.New()
+		ac.Placeholder = "Enter authorization code..."
+		ac.CharLimit = 256
+		ac.SetWidth(100)
+		acs := ac.Styles()
+		acs.Cursor.Color = m.Styles.InputFocused.GetForeground()
+		ac.SetStyles(acs)
+		ac.Focus()
+		m.AuthCodeInput = ac
+
+		verifier, challenge, err := gcloud.GeneratePKCE()
+		if err == nil {
+			m.CodeVerifier = verifier
+			m.AuthURL, _ = gcloud.BuildAuthURL(m.Config, gcloud.OOBRedirectURI, challenge)
+		}
+	}
 
 	configDir, _, userHomeDir := types.DefaultConfigPaths()
 

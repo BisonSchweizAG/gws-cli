@@ -1,17 +1,22 @@
 package gcloud
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"charm.land/lipgloss/v2"
 	"github.com/phayes/freeport"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -22,12 +27,15 @@ import (
 )
 
 const (
-	userAgent = "google-cloud-sdk"
+	userAgent      = "google-cloud-sdk"
+	OOBRedirectURI = "urn:ietf:wg:oauth:2.0:oob"
 )
 
 var (
 	ClientID     = ""
 	ClientSecret = ""
+
+	authStdin io.Reader = os.Stdin
 
 	oauthConfig = &oauth2.Config{
 		ClientID:     ClientID,
@@ -40,8 +48,8 @@ var (
 	}
 )
 
-// Generate PKCE Code Verifier and SHA-256 Code Challenge.
-func generatePKCE() (codeVerifier, codeChallenge string, err error) {
+// GeneratePKCE generates PKCE Code Verifier and SHA-256 Code Challenge.
+func GeneratePKCE() (codeVerifier, codeChallenge string, err error) {
 	verifierBytes := make([]byte, 32)
 	_, err = rand.Read(verifierBytes)
 	if err != nil {
@@ -55,6 +63,58 @@ func generatePKCE() (codeVerifier, codeChallenge string, err error) {
 	// Base64 URL encode the hash to create the code challenge
 	codeChallenge = base64.RawURLEncoding.EncodeToString(hash[:])
 	return codeVerifier, codeChallenge, nil
+}
+
+// BuildAuthURL builds the authorization URL with PKCE and context settings.
+func BuildAuthURL(cfg *types.Config, redirectURL, codeChallenge string) (authURL, state string) {
+	localOAuth := *oauthConfig
+	localOAuth.RedirectURL = redirectURL
+
+	state = "state"
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err == nil {
+		state = base64.RawURLEncoding.EncodeToString(b)
+	}
+
+	options := []oauth2.AuthCodeOption{
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+	}
+	if sshContext := cfg.CurrentContext(); sshContext != nil && sshContext.GCloud != nil && sshContext.GCloud.Account != "" {
+		options = append(options, oauth2.SetAuthURLParam("login_hint", sshContext.GCloud.Account))
+	} else {
+		options = append(options, oauth2.SetAuthURLParam("prompt", "select_account"))
+	}
+
+	return localOAuth.AuthCodeURL(state, options...), state
+}
+
+// ExchangeAuthCode exchanges an authorization code for an OAuth2 token and persists it.
+func ExchangeAuthCode(ctx context.Context, cfg *types.Config, code, codeVerifier, redirectURL string) (*oauth2.Token, error) {
+	localOAuth := *oauthConfig
+	localOAuth.RedirectURL = redirectURL
+
+	token, err := localOAuth.Exchange(ctx, code,
+		oauth2.SetAuthURLParam("code_verifier", codeVerifier),
+		oauth2.SetAuthURLParam("client_secret", localOAuth.ClientSecret),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save token (may not contain a refresh token if consent not granted)
+	if err := cfg.SetToken(*token); err != nil {
+		// log save error but continue - we still return the token for in-memory usage
+		log.Logf("Failed to persist token: %v", err)
+	}
+
+	// Warn if the refresh token was not provided.
+	if token.RefreshToken == "" {
+		log.Log("Warning: no refresh token returned. You may need to re-auth with prompt=consent to get a refresh token.")
+	}
+
+	return token, nil
 }
 
 func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
@@ -85,39 +145,53 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 		}
 	}
 
-	codeVerifier, codeChallenge, err := generatePKCE()
+	codeVerifier, codeChallenge, err := GeneratePKCE()
 	if err != nil {
 		return nil, err
 	}
 
+	if cfg.NoBrowser {
+		return loginNoBrowser(ctx, cfg, codeVerifier, codeChallenge)
+	}
+
+	return loginBrowser(ctx, cfg, codeVerifier, codeChallenge)
+}
+
+func loginNoBrowser(ctx context.Context, cfg *types.Config, codeVerifier, codeChallenge string) (oauth2.TokenSource, error) {
+	authURL, _ := BuildAuthURL(cfg, OOBRedirectURI, codeChallenge)
+
+	linkStyle := lipgloss.NewStyle().Underline(true).Hyperlink(authURL)
+	fmt.Printf("Go to the following link in your browser:\n\n%s\n\n", linkStyle.Render(authURL))
+	fmt.Print("Enter authorization code: ")
+
+	reader := bufio.NewReader(authStdin)
+	code, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read authorization code: %w", err)
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, errors.New("authorization code cannot be empty")
+	}
+
+	token, err := ExchangeAuthCode(ctx, cfg, code, codeVerifier, OOBRedirectURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange authorization code: %w", err)
+	}
+
+	return newTokenSourceWithRefreshCheck(ctx, token, cfg), nil
+}
+
+func loginBrowser(ctx context.Context, cfg *types.Config, codeVerifier, codeChallenge string) (oauth2.TokenSource, error) {
 	port, err := freeport.GetFreePort()
 	if err != nil {
 		return nil, err
 	}
 
 	// Use a per-request copy so we don't race other callers that may rely on oauthConfig
-	localOAuth := *oauthConfig
 	//nolint:revive // http is ok for a local callback
-	localOAuth.RedirectURL = fmt.Sprintf("http://%s/", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-
-	state := "state"
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err == nil {
-		state = base64.RawURLEncoding.EncodeToString(b)
-	}
-
-	options := []oauth2.AuthCodeOption{
-		oauth2.AccessTypeOffline,
-		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
-		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-	}
-	if sshContext := cfg.CurrentContext(); sshContext != nil && sshContext.GCloud != nil && sshContext.GCloud.Account != "" {
-		options = append(options, oauth2.SetAuthURLParam("login_hint", sshContext.GCloud.Account))
-	} else {
-		options = append(options, oauth2.SetAuthURLParam("prompt", "select_account"))
-	}
-
-	authURL := localOAuth.AuthCodeURL(state, options...)
+	redirectURL := fmt.Sprintf("http://%s/", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	authURL, state := BuildAuthURL(cfg, redirectURL, codeChallenge)
 
 	// Open URL in browser
 	log.Log("Opening URL: " + authURL)
@@ -152,21 +226,12 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 			return
 		}
 
-		token, err := localOAuth.Exchange(ctx, code,
-			oauth2.SetAuthURLParam("code_verifier", codeVerifier),
-			oauth2.SetAuthURLParam("client_secret", localOAuth.ClientSecret),
-		)
+		token, err := ExchangeAuthCode(ctx, cfg, code, codeVerifier, redirectURL)
 		if err != nil {
 			http.Error(w, "Failed to get token", http.StatusInternalServerError)
 			log.Logf("🚨 OAuth exchange error: %v", err)
 			shutdownChan <- authResult{nil, err}
 			return
-		}
-
-		// Save token (may not contain a refresh token if consent not granted)
-		if err := cfg.SetToken(*token); err != nil {
-			// log save error but continue - we still return the token for in-memory usage
-			log.Logf("Failed to persist token: %v", err)
 		}
 
 		w.Header().Set("Content-Type", "text/html")
@@ -189,11 +254,6 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 		return nil, res.err
 	}
 	log.Log("Authenticated...")
-
-	// Warn if the refresh token was not provided.
-	if res.token.RefreshToken == "" {
-		log.Log("Warning: no refresh token returned. You may need to re-auth with prompt=consent to get a refresh token.")
-	}
 
 	return newTokenSourceWithRefreshCheck(ctx, res.token, cfg), nil
 }

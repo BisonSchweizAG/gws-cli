@@ -29,6 +29,7 @@ type Config struct {
 	CurrentContextName  string              `yaml:"currentContext"`
 	FilePath            string              `yaml:"-"`
 	TokenCheck          bool                `yaml:"-"`
+	NoBrowser           bool                `yaml:"noBrowser,omitempty"`
 	SSHTimeoutSeconds   int                 `yaml:"sshTimeoutSeconds,omitempty"`
 	StartTimeoutSeconds int                 `yaml:"startTimeoutSeconds,omitempty"`
 	currentContext      *Context

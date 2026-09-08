@@ -26,5 +26,8 @@ func runSetup(_ *cobra.Command, _ []string) error {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	if flagNoBrowser {
+		cfg.NoBrowser = true
+	}
 	return setup.Run(cfg, flagContext)
 }

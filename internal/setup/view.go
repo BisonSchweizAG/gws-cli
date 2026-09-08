@@ -17,15 +17,32 @@ func (m Model) View() tea.View {
 	if m.Step == stepLogin {
 		b.WriteString(m.Styles.Title.Render(">_ Google Cloud Login"))
 		b.WriteString("\n\n")
-		b.WriteString("Please login in your browser...")
-		b.WriteString("\n\n")
-		if m.StatusMessage != "" {
-			b.WriteString(m.Styles.ErrText.Render(m.StatusMessage))
+		if m.Config.NoBrowser {
+			b.WriteString("Enter authorization code:\n")
+			b.WriteString(m.AuthCodeInput.View())
 			b.WriteString("\n\n")
+			if m.StatusMessage != "" {
+				b.WriteString(m.Styles.ErrText.Render(m.StatusMessage))
+				b.WriteString("\n\n")
+			}
+			b.WriteString(m.Styles.Help.Render("enter: submit / esc: quit"))
+		} else {
+			b.WriteString("Please login in your browser...")
+			b.WriteString("\n\n")
+			if m.StatusMessage != "" {
+				b.WriteString(m.Styles.ErrText.Render(m.StatusMessage))
+				b.WriteString("\n\n")
+			}
+			b.WriteString(m.Styles.Help.Render("esc: quit"))
 		}
-		b.WriteString(m.Styles.Help.Render("esc: quit"))
 		b.WriteString(m.renderLogs())
-		v := tea.NewView(m.Styles.Border.Width(m.Width - 4).Render(b.String()))
+		box := m.Styles.Border.Width(m.Width - 4).Render(b.String())
+		content := box
+		if m.AuthURL != "" {
+			linkStyle := lipgloss.NewStyle().Underline(true).Foreground(Indigo).Hyperlink(m.AuthURL)
+			content += "\n\nGo to the following link in your browser:\n\n" + linkStyle.Render(m.AuthURL)
+		}
+		v := tea.NewView(content)
 		v.AltScreen = true
 		return v
 	}

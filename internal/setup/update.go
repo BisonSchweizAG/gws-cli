@@ -30,6 +30,23 @@ func (m Model) Init() tea.Cmd {
 		}
 	})
 
+	if m.Config.NoBrowser {
+		// If token can already be refreshed without browser interaction, try that first:
+		if m.Config.Token != nil && m.Config.Token.Token.RefreshToken != "" {
+			return tea.Batch(
+				func() tea.Msg {
+					_, err := gcloud.Login(context.Background(), m.Config)
+					if err != nil {
+						return nil
+					}
+					return loginMsg{}
+				},
+				m.waitForLog(),
+			)
+		}
+		return m.waitForLog()
+	}
+
 	return tea.Batch(
 		func() tea.Msg {
 			_, err := gcloud.Login(context.Background(), m.Config)
@@ -54,6 +71,15 @@ func (m Model) waitForLog() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+		if m.FilePickerActive {
+			var cmd tea.Cmd
+			m.Fp, cmd = m.Fp.Update(msg)
+			return m, cmd
+		}
+		return m, nil
 	case loginMsg:
 		m.Step = stepProject
 		m.StatusMessage = "Fetching projects..."
@@ -83,6 +109,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyFilter()
 		return m, nil
 	case logMsg:
+		if strings.HasPrefix(string(msg), "Opening URL: ") {
+			m.AuthURL = strings.TrimPrefix(string(msg), "Opening URL: ")
+			m.Logs = append(m.Logs, "Opening browser...")
+			return m, m.waitForLog()
+		}
 		m.Logs = append(m.Logs, string(msg))
 		return m, m.waitForLog()
 	case errMsg:
@@ -91,9 +122,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.Step == stepLogin {
-		if key, ok := msg.(tea.KeyPressMsg); ok && (key.String() == "ctrl+c" || key.String() == "esc") {
-			m.Aborted = true
-			return m, tea.Quit
+		if key, ok := msg.(tea.KeyPressMsg); ok {
+			switch key.String() {
+			case "ctrl+c", "esc":
+				m.Aborted = true
+				return m, tea.Quit
+			case "enter":
+				if m.Config.NoBrowser {
+					code := strings.TrimSpace(m.AuthCodeInput.Value())
+					if code == "" {
+						m.StatusMessage = "Please enter an authorization code"
+						return m, nil
+					}
+					m.StatusMessage = "Exchanging authorization code..."
+					return m, func() tea.Msg {
+						_, err := gcloud.ExchangeAuthCode(
+							context.Background(),
+							m.Config,
+							code,
+							m.CodeVerifier,
+							gcloud.OOBRedirectURI,
+						)
+						if err != nil {
+							return errMsg(err)
+						}
+						return loginMsg{}
+					}
+				}
+			}
+		}
+		if m.Config.NoBrowser {
+			var cmd tea.Cmd
+			m.AuthCodeInput, cmd = m.AuthCodeInput.Update(msg)
+			return m, cmd
 		}
 		return m, nil
 	}
@@ -119,8 +180,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		if (m.Focused == PrivateKeyFile || m.Focused == KnownHostsFile) && msg.String() == "ctrl+f" {
 			m.FilePickerActive = true
 			m.FilePickerField = m.Focused
@@ -181,10 +241,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			return m, nil
 		}
-	case tea.WindowSizeMsg:
-		m.Width = msg.Width
-		m.Height = msg.Height
-		return m, nil
 	}
 
 	cmd := m.updateInputs(msg)

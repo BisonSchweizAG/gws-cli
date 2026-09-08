@@ -54,6 +54,9 @@ type Model struct {
 	LoginDone     bool
 	ListCursor    int
 	FilterInput   textinput.Model
+	AuthCodeInput textinput.Model
+	AuthURL       string
+	CodeVerifier  string
 	Projects      []gcloud.Project
 	Workstations  []gcloud.Workstation
 	FilteredItems []listItem
