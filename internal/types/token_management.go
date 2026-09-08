@@ -111,3 +111,21 @@ func SetToken(token oauth2.Token) error {
 
 	return SaveToken(token)
 }
+
+func DeleteToken() error {
+	err := keyring.Delete("gws", "token")
+	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		log.Logf("Keyring delete error: %v", err)
+	}
+
+	tokenPath, err := GetTokenFilePath()
+	if err != nil {
+		return err
+	}
+
+	if err := os.Remove(tokenPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	return nil
+}

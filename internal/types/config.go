@@ -259,3 +259,10 @@ func (c *Config) SetToken(token oauth2.Token) error {
 	}
 	return nil
 }
+
+func (c *Config) DeleteToken() error {
+	if c != nil {
+		c.Token = nil
+	}
+	return DeleteToken()
+}
