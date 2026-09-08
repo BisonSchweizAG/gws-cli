@@ -16,6 +16,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
+	"github.com/bisonschweizag/gws-cli/icon"
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
@@ -169,16 +170,7 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 		}
 
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, `
-<html>
-<head><title>gws Google Authentication Successful</title></head>
-<body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
-	<h1>gws Google Authentication Successful!</h1>
-	<p>You can now close this window and return to the tool.</p>
-	<script>window.onload = function() { setTimeout(function() { window.close(); }, 1000); }</script>
-</body>
-</html>
-`)
+		fmt.Fprint(w, callbackHTML())
 		shutdownChan <- authResult{token, nil}
 	})
 
@@ -204,6 +196,22 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 	}
 
 	return newTokenSourceWithRefreshCheck(ctx, res.token, cfg), nil
+}
+
+func callbackHTML() string {
+	return fmt.Sprintf(`
+<html>
+<head><title>gws Google Authentication Successful</title></head>
+<body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+	<div style="width: 128px; height: 128px; margin: 0 auto 20px auto;">
+%s
+	</div>
+	<h1>gws Google Authentication Successful!</h1>
+	<p>You can now close this window and return to the tool.</p>
+	<script>window.onload = function() { setTimeout(function() { window.close(); }, 1000); }</script>
+</body>
+</html>
+`, icon.IconSVG)
 }
 
 type userAgentTransport struct {
