@@ -49,15 +49,23 @@ var statusCmd = &cobra.Command{
 			t.AppendHeader(table.Row{"CONTEXT", "NAME", "STATE", "UPTIME"})
 		}
 		for _, s := range states {
+			contextName := formatContext(s.Context, cfg.CurrentContextName)
 			if wide {
-				t.AppendRow(table.Row{s.Context, s.Project, s.Config, s.Name, formatState(s.State), formatUptime(s.Uptime)})
+				t.AppendRow(table.Row{contextName, s.Project, s.Config, s.Name, formatState(s.State), formatUptime(s.Uptime)})
 			} else {
-				t.AppendRow(table.Row{s.Context, s.Name, formatState(s.State), formatUptime(s.Uptime)})
+				t.AppendRow(table.Row{contextName, s.Name, formatState(s.State), formatUptime(s.Uptime)})
 			}
 		}
 		t.Render()
 		return nil
 	},
+}
+
+func formatContext(name, current string) string {
+	if current != "" && name == current {
+		return name + " ✅"
+	}
+	return name
 }
 
 func formatState(s workstationspb.Workstation_State) string {
