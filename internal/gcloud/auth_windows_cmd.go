@@ -15,5 +15,5 @@ func windowsCmd(ctx context.Context, cfg *types.Config, authURL string) *exec.Cm
 			authURL,
 		)
 	}
-	return exec.CommandContext(ctx, "rundll32.exe", "url.dll,FileProtocolHandler", authURL)
+	return exec.CommandContext(ctx, "cmd.exe", "/c", "start", "", authURL)
 }
