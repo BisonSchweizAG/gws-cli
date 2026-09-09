@@ -13,6 +13,8 @@ builds:
   - binary: gws
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     hooks:
       #pre:
       #  - goversioninfo -platform-specific=true -icon=icon/icon.ico -skip-versioninfo=true
@@ -35,6 +37,15 @@ builds:
       - amd64
 checksum:
   name_template: 'checksums.txt'
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - "sign-blob"
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
 snapshot:
   version_template: "{{ .Tag }}-next"
 sboms:

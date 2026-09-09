@@ -48,6 +48,9 @@ jobs:
   test-release:
     name: test release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,6 +66,9 @@ jobs:
         with:
           path: bin
           key: release-${{ runner.os }}-bin-${{ hashFiles('.toolbox.mk') }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Install osslsigncode
         run: sudo apt-get update && sudo apt-get install -y osslsigncode && env

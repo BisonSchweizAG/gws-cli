@@ -1,0 +1,8 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.5/.schema/devbox.schema.json",
+  "packages": [
+    "osslsigncode@2.14",
+    "gnumake@4.4.1",
+    "cosign@3.1.3"
+  ]
+}
