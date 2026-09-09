@@ -19,6 +19,8 @@ import (
 	"github.com/bisonschweizag/gws-cli/icon"
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/types"
+
+	_ "embed"
 )
 
 const (
@@ -28,6 +30,9 @@ const (
 var (
 	ClientID     = ""
 	ClientSecret = ""
+
+	//go:embed templates/callback.html
+	callbackPage string
 
 	oauthConfig = &oauth2.Config{
 		ClientID:     ClientID,
@@ -199,19 +204,7 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 }
 
 func callbackHTML() string {
-	return fmt.Sprintf(`
-<html>
-<head><title>gws Google Authentication Successful</title></head>
-<body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
-	<div style="width: 128px; height: 128px; margin: 0 auto 20px auto;">
-%s
-	</div>
-	<h1>gws Google Authentication Successful!</h1>
-	<p>You can now close this window and return to the tool.</p>
-	<script>window.onload = function() { setTimeout(function() { window.close(); }, 1000); }</script>
-</body>
-</html>
-`, icon.IconSVG)
+	return fmt.Sprintf(callbackPage, icon.IconSVG)
 }
 
 type userAgentTransport struct {
