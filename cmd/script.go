@@ -74,7 +74,7 @@ var scriptsWinReconnectCmd = &cobra.Command{
 			cmd,
 			args,
 			script.WindowsReconnectSSH,
-			"💾 Writing SSH reconnect script for context %q on Windows to %q\n",
+			"💾 Writing SSH reconnect script for context %q on Windows to %s\n",
 			0o644,
 		)
 	},
@@ -89,7 +89,7 @@ var scriptsUnixReconnectCmd = &cobra.Command{
 			cmd,
 			args,
 			script.UnixReconnectSSH,
-			"💾 Writing SSH bash reconnect script for context %q to %q\n",
+			"💾 Writing SSH bash reconnect script for context %q to %s\n",
 			0o755,
 		)
 	},
