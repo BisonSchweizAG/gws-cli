@@ -80,7 +80,7 @@ jobs:
           SIGNING_CERT_PFX: ${{ secrets.SIGNING_CERT_PFX }}
 
       - name: Upload Windows build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: gws.exe
           path: dist/gws_windows_amd64_v1/gws.exe
