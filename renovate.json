@@ -1,5 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    ":gitSignOff",
+    ":semanticCommits",
+    ":enableVulnerabilityAlerts",
+    "helpers:pinGitHubActionDigests"
+  ],
   "vulnerabilityAlerts": {
     "enabled": true,
     "groupName": "security updates"
