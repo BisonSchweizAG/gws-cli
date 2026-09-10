@@ -36,6 +36,8 @@ type Config struct {
 
 	ChromeBrowser    *ChromeBrowserConfig `yaml:"chromeBrowser,omitempty"`
 	JetbrainsGateway *GatewayConfig       `yaml:"jetbrainsGateway,omitempty"`
+
+	AuthURLChan chan string `yaml:"-"`
 }
 
 type ChromeBrowserConfig struct {
@@ -265,4 +267,24 @@ func (c *Config) DeleteToken() error {
 		c.Token = nil
 	}
 	return DeleteToken()
+}
+
+// InitAuthChannels initializes the channels used for interactive login flow.
+func (c *Config) InitAuthChannels() {
+	if c == nil {
+		return
+	}
+	if c.AuthURLChan == nil {
+		c.AuthURLChan = make(chan string, 1)
+	}
+}
+
+// SendAuthURL dispatches an authorization URL to the waiting TUI if configured.
+func (c *Config) SendAuthURL(url string) {
+	if c != nil && c.AuthURLChan != nil {
+		select {
+		case c.AuthURLChan <- url:
+		default:
+		}
+	}
 }

@@ -188,3 +188,24 @@ func TestConfig_SSHTimeout(t *testing.T) {
 		})
 	}
 }
+
+func TestConfig_AuthChannels(t *testing.T) {
+	cfg := &Config{}
+	cfg.InitAuthChannels()
+
+	if cfg.AuthURLChan == nil {
+		t.Fatal("expected AuthURLChan to be initialized")
+	}
+
+	testURL := "https://accounts.google.com/o/oauth2/auth?client_id=test"
+	cfg.SendAuthURL(testURL)
+
+	select {
+	case url := <-cfg.AuthURLChan:
+		if url != testURL {
+			t.Errorf("expected url %s, got %s", testURL, url)
+		}
+	default:
+		t.Error("expected url to be delivered")
+	}
+}

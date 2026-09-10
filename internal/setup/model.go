@@ -60,6 +60,11 @@ type Model struct {
 
 	Logs    []string
 	LogChan chan string
+
+	// Auth URL and Clipboard support
+	AuthURL           string
+	CopiedToClipboard bool
+	ClipboardMsg      string
 }
 
 type listItem struct {
@@ -68,7 +73,8 @@ type listItem struct {
 }
 
 type (
-	logMsg string
+	logMsg     string
+	authURLMsg string
 )
 
 type Input struct {
