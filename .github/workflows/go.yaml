@@ -78,3 +78,10 @@ jobs:
         env:
           SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
           SIGNING_CERT_PFX: ${{ secrets.SIGNING_CERT_PFX }}
+
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gws.exe
+          path: dist/gws_windows_amd64_v1/gws.exe
+          retention-days: 1
