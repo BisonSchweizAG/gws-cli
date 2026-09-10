@@ -31,17 +31,19 @@ var (
 	ClientID     = ""
 	ClientSecret = ""
 
+	CloudScopes = []string{
+		"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/cloud-platform",
+	}
+
 	//go:embed templates/callback.html
 	callbackPage string
 
 	oauthConfig = &oauth2.Config{
 		ClientID:     ClientID,
 		ClientSecret: ClientSecret,
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/cloud-platform",
-		},
-		Endpoint: google.Endpoint,
+		Scopes:       CloudScopes,
+		Endpoint:     google.Endpoint,
 	}
 )
 
@@ -86,7 +88,19 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 		token, err := tokenSource.Token()
 		if err == nil {
 			_ = cfg.SetToken(*token)
-			return newTokenSourceWithRefreshCheck(ctx, token, cfg), nil
+			return newTokenSourceWithRefreshCheck(ctx, token, cfg, oauthConfig), nil
+		}
+		// Also try GCloud credentials for token refresh if oauthConfig failed
+		if oauthConfig.ClientID != ClientID {
+			gcloudOAuth := *oauthConfig
+			gcloudOAuth.ClientID = ClientID
+			gcloudOAuth.ClientSecret = ClientSecret
+			tokenSource = gcloudOAuth.TokenSource(ctx, &existingToken)
+			token, err = tokenSource.Token()
+			if err == nil {
+				_ = cfg.SetToken(*token)
+				return newTokenSourceWithRefreshCheck(ctx, token, cfg, &gcloudOAuth), nil
+			}
 		}
 	}
 
@@ -95,21 +109,25 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 		return nil, err
 	}
 
-	port, err := freeport.GetFreePort()
-	if err != nil {
-		return nil, err
-	}
-
-	// Use a per-request copy so we don't race other callers that may rely on oauthConfig
-	localOAuth := *oauthConfig
-	//nolint:revive // http is ok for a local callback
-	localOAuth.RedirectURL = fmt.Sprintf("http://%s/", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-
 	state := "state"
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err == nil {
 		state = base64.RawURLEncoding.EncodeToString(b)
 	}
+
+	// Use a per-request copy so we don't race other callers that may rely on oauthConfig
+	localOAuth := *oauthConfig
+	localOAuth.ClientID = ClientID
+	localOAuth.ClientSecret = ClientSecret
+	localOAuth.Scopes = CloudScopes
+
+	port, err := freeport.GetFreePort()
+	if err != nil {
+		return nil, err
+	}
+
+	//nolint:revive // http is ok for a local callback
+	localOAuth.RedirectURL = fmt.Sprintf("http://%s/", net.JoinHostPort("localhost", strconv.Itoa(port)))
 
 	options := []oauth2.AuthCodeOption{
 		oauth2.AccessTypeOffline,
@@ -124,8 +142,10 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 
 	authURL := localOAuth.AuthCodeURL(state, options...)
 
+	cfg.SendAuthURL(authURL)
+
 	// Open URL in browser
-	log.Log("Opening URL: " + authURL)
+	log.Log("Opening browser for authentication...")
 	openBrowser(ctx, cfg, authURL)
 
 	// Create a channel for shutdown signaling that can carry a token or an error.
@@ -187,8 +207,14 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 	}()
 
 	log.Log("Waiting for authentication...")
-	// Block until we receive a shutdown signal
-	res := <-shutdownChan
+	var res authResult
+	select {
+	case res = <-shutdownChan:
+	case <-ctx.Done():
+		_ = server.Shutdown(ctx)
+		return nil, ctx.Err()
+	}
+
 	_ = server.Shutdown(ctx)
 	if res.err != nil {
 		return nil, res.err
@@ -200,7 +226,7 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 		log.Log("Warning: no refresh token returned. You may need to re-auth with prompt=consent to get a refresh token.")
 	}
 
-	return newTokenSourceWithRefreshCheck(ctx, res.token, cfg), nil
+	return newTokenSourceWithRefreshCheck(ctx, res.token, cfg, &localOAuth), nil
 }
 
 func callbackHTML() string {
@@ -218,6 +244,7 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 }
 
 type TokenSourceWithRefreshCheck struct {
+	oauthCfg    *oauth2.Config
 	source      oauth2.TokenSource
 	checkPeriod time.Duration
 	lastToken   *oauth2.Token
@@ -226,11 +253,20 @@ type TokenSourceWithRefreshCheck struct {
 	cfg         *types.Config
 }
 
-func newTokenSourceWithRefreshCheck(ctx context.Context, token *oauth2.Token, cfg *types.Config) oauth2.TokenSource {
+func newTokenSourceWithRefreshCheck(
+	ctx context.Context,
+	token *oauth2.Token,
+	cfg *types.Config,
+	oauthCfg *oauth2.Config,
+) oauth2.TokenSource {
 	newCtx, cancel := context.WithCancel(ctx)
+	if oauthCfg == nil {
+		oauthCfg = oauthConfig
+	}
 	ts := &TokenSourceWithRefreshCheck{
 		checkPeriod: 10 * time.Minute,
-		source:      oauthConfig.TokenSource(newCtx, token),
+		oauthCfg:    oauthCfg,
+		source:      oauthCfg.TokenSource(newCtx, token),
 		cfg:         cfg,
 		done:        make(chan struct{}),
 		cancel:      cancel,

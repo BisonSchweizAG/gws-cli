@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
 func TestLogoutCmd(t *testing.T) {
+	keyring.MockInit()
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
 
