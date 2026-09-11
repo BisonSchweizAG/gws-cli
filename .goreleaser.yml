@@ -16,17 +16,8 @@ builds:
     flags:
       - -trimpath
     hooks:
-      pre:
-        - "goversioninfo -platform-specific=true \
-            -ver-major={{ .Major }} \
-            -ver-minor={{ .Minor }} \
-            -ver-patch={{ .Patch }} \
-            -product-ver-major={{ .Major }} \
-            -product-ver-minor={{ .Minor }} \
-            -product-ver-patch={{ .Patch }} \
-            -file-version={{ .Version }} \
-            -private-build=git:{{ .ShortCommit }} \
-            version/versioninfo.json"
+      #pre:
+      #  - goversioninfo -platform-specific=true -icon=icon/icon.ico -skip-versioninfo=true
       post:
         - |
           sh -c 'if [ "{{ .Os }}" = "windows" ]; then 
