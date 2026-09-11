@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	workstations "cloud.google.com/go/workstations/apiv1"
@@ -20,12 +21,56 @@ import (
 
 var pollInterval = 10 * time.Second
 
+var (
+	clientMu     sync.Mutex
+	cachedClient *workstations.Client
+)
+
+// getClient returns a shared, reusable workstations.Client, creating it on
+// first use. Subsequent calls reuse the same client instance, avoiding the
+// overhead of re-authenticating and re-dialing for every operation.
+func getClient(ctx context.Context, cfg *types.Config) (*workstations.Client, error) {
+	clientMu.Lock()
+	defer clientMu.Unlock()
+
+	if cachedClient != nil {
+		return cachedClient, nil
+	}
+
+	tokenSource, err := Login(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := workstations.NewClient(ctx, option.WithTokenSource(tokenSource))
+	if err != nil {
+		return nil, err
+	}
+
+	cachedClient = c
+	return cachedClient, nil
+}
+
+// CloseClient closes the shared workstations.Client, if one was created.
+// It should be called once, when the application is shutting down.
+func CloseClient() error {
+	clientMu.Lock()
+	defer clientMu.Unlock()
+
+	if cachedClient == nil {
+		return nil
+	}
+
+	err := cachedClient.Close()
+	cachedClient = nil
+	return err
+}
+
 func StartWorkstation(ctx context.Context, cfg *types.Config, boostConfig string) error {
-	sshContext, c, ws, err := setup(ctx, cfg)
+	sshContext, c, _, ws, err := setup(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	defer c.Close()
 
 	start := time.Now()
 	timeout := cfg.StartTimeout()
@@ -112,39 +157,45 @@ func waitForWorkstationRunning(
 	}
 }
 
-func setup(ctx context.Context, cfg *types.Config) (*types.Context, *workstations.Client, *workstationspb.Workstation, error) {
+func setup(
+	ctx context.Context,
+	cfg *types.Config,
+) (*types.Context, *workstations.Client, *workstationspb.WorkstationConfig, *workstationspb.Workstation, error) {
 	sshContext := cfg.CurrentContext()
 	if sshContext == nil || sshContext.GCloud == nil {
 		log.Log("No gcloud config found")
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	// gcloud auth application-default login
 	// Default credentials: ${HOME}/.config/gcloud/application_default_credentials.json
-	tokenSource, err := Login(ctx, cfg)
-	if err != nil {
-		log.Logf("Error getting OAUTH token: %v", err)
-		return nil, nil, nil, err
-	}
-
-	c, err := workstations.NewClient(ctx, option.WithTokenSource(tokenSource))
+	c, err := getClient(ctx, cfg)
 	if err != nil {
 		log.Logf("Error creating workstations client: %v", err)
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	wsName := fmt.Sprintf("projects/%s/locations/%s/workstationClusters/%s/workstationConfigs/%s/workstations/%s",
+	wsConfig := fmt.Sprintf("projects/%s/locations/%s/workstationClusters/%s/workstationConfigs/%s",
 		sshContext.GCloud.Project,
 		sshContext.GCloud.Region,
 		sshContext.GCloud.Cluster,
 		sshContext.GCloud.Config,
+	)
+	wsName := fmt.Sprintf("%s/workstations/%s",
+		wsConfig,
 		sshContext.GCloud.Name,
 	)
+
+	wsc, err := c.GetWorkstationConfig(ctx, &workstationspb.GetWorkstationConfigRequest{Name: wsConfig})
+	if err != nil {
+		log.Logf("Error getting workstation config: %v", err)
+		return nil, nil, nil, nil, err
+	}
 
 	ws, err := c.GetWorkstation(ctx, &workstationspb.GetWorkstationRequest{Name: wsName})
 	if err != nil {
 		log.Logf("Error getting workstation: %v", err)
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return sshContext, c, ws, err
+	return sshContext, c, wsc, ws, err
 }
 
 type Project struct {
@@ -187,16 +238,10 @@ type Workstation struct {
 }
 
 func ListWorkstations(ctx context.Context, cfg *types.Config, project string) ([]Workstation, error) {
-	tokenSource, err := Login(ctx, cfg)
+	c, err := getClient(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-
-	c, err := workstations.NewClient(ctx, option.WithTokenSource(tokenSource))
-	if err != nil {
-		return nil, err
-	}
-	defer c.Close()
 
 	var workstationsList []Workstation
 
@@ -301,12 +346,10 @@ func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
 }
 
 func StopWorkstation(ctx context.Context, cfg *types.Config) error {
-	sshContext, c, ws, err := setup(ctx, cfg)
+	sshContext, c, _, ws, err := setup(ctx, cfg)
 	if err != nil {
 		return err
 	}
-
-	defer c.Close()
 
 	if ws.GetState() != workstationspb.Workstation_STATE_STOPPED {
 		start := time.Now()
@@ -332,15 +375,18 @@ func StopWorkstation(ctx context.Context, cfg *types.Config) error {
 }
 
 type WorkstationState struct {
-	Context string
-	Project string
-	Config  string
-	Name    string
-	State   workstationspb.Workstation_State
-	Uptime  *time.Duration
+	Context          string
+	Project          string
+	Config           string
+	Name             string
+	State            workstationspb.Workstation_State
+	Uptime           *time.Duration
+	RunningTimeout   *time.Duration
+	IdleTimeout      *time.Duration
+	ExpectedShutdown *time.Time
 }
 
-func GetWorkstationStates(ctx context.Context, cfg *types.Config) ([]WorkstationState, error) {
+func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter string) ([]WorkstationState, error) {
 	var states []WorkstationState
 	curr := cfg.CurrentContextName
 	defer func() { _ = cfg.UseContext(curr) }()
@@ -348,8 +394,11 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config) ([]Workstation
 		if ctxCfg.GCloud == nil {
 			continue
 		}
+		if contextFilter != "" && name != contextFilter {
+			continue
+		}
 		_ = cfg.UseContext(name)
-		_, c, ws, err := setup(ctx, cfg)
+		_, _, wsc, ws, err := setup(ctx, cfg)
 		if err != nil {
 			states = append(states, WorkstationState{
 				Context: name,
@@ -365,15 +414,31 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config) ([]Workstation
 			u := time.Since(ws.GetStartTime().AsTime()).Round(time.Second)
 			uptime = &u
 		}
+		var runningTimeout, idleTimeout *time.Duration
+		if wsc.GetRunningTimeout() != nil {
+			rt := wsc.GetRunningTimeout().AsDuration()
+			runningTimeout = &rt
+		}
+		if wsc.GetIdleTimeout() != nil {
+			it := wsc.GetIdleTimeout().AsDuration()
+			idleTimeout = &it
+		}
+		var expectedShutdown *time.Time
+		if ws.GetState() == workstationspb.Workstation_STATE_RUNNING && ws.GetStartTime() != nil && runningTimeout != nil {
+			es := ws.GetStartTime().AsTime().Add(*runningTimeout)
+			expectedShutdown = &es
+		}
 		states = append(states, WorkstationState{
-			Context: name,
-			Project: ctxCfg.GCloud.Project,
-			Config:  ctxCfg.GCloud.Config,
-			Name:    ctxCfg.GCloud.Name,
-			State:   ws.GetState(),
-			Uptime:  uptime,
+			Context:          name,
+			Project:          ctxCfg.GCloud.Project,
+			Config:           ctxCfg.GCloud.Config,
+			Name:             ctxCfg.GCloud.Name,
+			State:            ws.GetState(),
+			Uptime:           uptime,
+			RunningTimeout:   runningTimeout,
+			IdleTimeout:      idleTimeout,
+			ExpectedShutdown: expectedShutdown,
 		})
-		c.Close()
 	}
 	return states, nil
 }

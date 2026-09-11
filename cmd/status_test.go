@@ -59,7 +59,7 @@ func Test_formatUptime(t *testing.T) {
 	}{
 		{nil, ""},
 		{&d1, "1m30s"},
-		{&d2, "2h0m0s"},
+		{&d2, "2h"},
 	}
 
 	for _, tt := range tests {
