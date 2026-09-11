@@ -36,11 +36,10 @@ type tunnel struct {
 }
 
 func TCPTunnelWithPassphrase(ctx context.Context, cfg *types.Config, port int) error {
-	sshContext, c, ws, err := setup(ctx, cfg)
+	sshContext, c, _, ws, err := setup(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	defer closeIt(c)
 
 	t := &tunnel{
 		headers: http.Header{},

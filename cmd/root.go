@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 	"github.com/bisonschweizag/gws-cli/version"
 )
@@ -31,6 +32,7 @@ func Execute() {
 func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	defer func() { _ = gcloud.CloseClient() }()
 	return rootCmd.ExecuteContext(ctx)
 }
 
