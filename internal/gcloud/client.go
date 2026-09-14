@@ -417,14 +417,19 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter 
 		var runningTimeout, idleTimeout *time.Duration
 		if wsc.GetRunningTimeout() != nil {
 			rt := wsc.GetRunningTimeout().AsDuration()
-			runningTimeout = &rt
+			if rt > 0 {
+				runningTimeout = &rt
+			}
 		}
 		if wsc.GetIdleTimeout() != nil {
 			it := wsc.GetIdleTimeout().AsDuration()
-			idleTimeout = &it
+			if it > 0 {
+				idleTimeout = &it
+			}
 		}
 		var expectedShutdown *time.Time
-		if ws.GetState() == workstationspb.Workstation_STATE_RUNNING && ws.GetStartTime() != nil && runningTimeout != nil {
+		if ws.GetState() == workstationspb.Workstation_STATE_RUNNING && ws.GetStartTime() != nil && runningTimeout != nil &&
+			*runningTimeout > 0 {
 			es := ws.GetStartTime().AsTime().Add(*runningTimeout)
 			expectedShutdown = &es
 		}
