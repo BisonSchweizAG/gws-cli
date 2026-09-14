@@ -52,10 +52,14 @@ var statusCmd = &cobra.Command{
 		rows := make([]table.Row, 0, len(states))
 		for _, s := range states {
 			contextName := formatContext(s.Context, cfg.CurrentContextName)
+			shutdown := formatExpectedShutdown(s.ExpectedShutdown)
+			if s.RunningTimeout == nil || *s.RunningTimeout == 0 {
+				shutdown = ""
+			}
 			if wide {
 				rows = append(rows, table.Row{
 					contextName, s.Project, s.Config, s.Name, formatState(s.State), formatUptime(s.Uptime),
-					formatExpectedShutdown(s.ExpectedShutdown), formatUptime(s.RunningTimeout), formatUptime(s.IdleTimeout),
+					shutdown, formatUptime(s.RunningTimeout), formatUptime(s.IdleTimeout),
 				})
 			} else {
 				rows = append(
@@ -65,7 +69,7 @@ var statusCmd = &cobra.Command{
 						s.Name,
 						formatState(s.State),
 						formatUptime(s.Uptime),
-						formatExpectedShutdown(s.ExpectedShutdown),
+						shutdown,
 					},
 				)
 			}
@@ -183,7 +187,7 @@ func formatUptime(u *time.Duration) string {
 }
 
 func formatExpectedShutdown(t *time.Time) string {
-	if t == nil {
+	if t == nil || t.IsZero() {
 		return ""
 	}
 	//nolint:gosmopolitan // Display expected shutdown time in the user's local timezone
