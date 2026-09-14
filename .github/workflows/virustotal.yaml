@@ -43,7 +43,7 @@ jobs:
           echo "tag_name=$RELEASE_TAG" >> $GITHUB_OUTPUT
 
       - name: Analyze Build Assets
-        uses: bakito/virustotal-action@979bbbb7d7918b4d558dc729bd4156185f1d1688 # v1.0.5
+        uses: bakito/virustotal-action@e44d2b92ff28424ce52e261e359d56467456fc64 # v2.0.1
         with:
           release_name: ${{ steps.latest_release.outputs.tag_name }}
           vt_api_key: ${{secrets.VT_API_KEY}}
