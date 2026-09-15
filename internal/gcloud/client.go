@@ -384,6 +384,7 @@ type WorkstationState struct {
 	RunningTimeout   *time.Duration
 	IdleTimeout      *time.Duration
 	ExpectedShutdown *time.Time
+	LastUpdated      *time.Time
 }
 
 func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter string) ([]WorkstationState, error) {
@@ -433,6 +434,12 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter 
 			es := ws.GetStartTime().AsTime().Add(*runningTimeout)
 			expectedShutdown = &es
 		}
+
+		var lastUpdated *time.Time
+		if ws.GetUpdateTime() != nil {
+			lastUpdated = new(ws.GetUpdateTime().AsTime())
+		}
+
 		states = append(states, WorkstationState{
 			Context:          name,
 			Project:          ctxCfg.GCloud.Project,
@@ -443,6 +450,7 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter 
 			RunningTimeout:   runningTimeout,
 			IdleTimeout:      idleTimeout,
 			ExpectedShutdown: expectedShutdown,
+			LastUpdated:      lastUpdated,
 		})
 	}
 	return states, nil
