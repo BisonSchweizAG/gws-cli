@@ -71,8 +71,8 @@ func Test_formatUptime(t *testing.T) {
 	}
 }
 
-func Test_formatExpectedShutdown(t *testing.T) {
-	//nolint:gosmopolitan // Local timezone needed to match formatExpectedShutdown behavior
+func Test_formatTime(t *testing.T) {
+	//nolint:gosmopolitan // Local timezone needed to match formatTime behavior
 	d := time.Date(2026, 9, 14, 15, 4, 5, 0, time.Local)
 	zero := time.Time{}
 	tests := []struct {
@@ -87,8 +87,31 @@ func Test_formatExpectedShutdown(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formatExpectedShutdown(tt.t); got != tt.expected {
-				t.Errorf("formatExpectedShutdown() = %v, want %v", got, tt.expected)
+			if got := formatTime(tt.t); got != tt.expected {
+				t.Errorf("formatTime() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func Test_formatDateTime(t *testing.T) {
+	//nolint:gosmopolitan // Local timezone needed to match formatDateTime behavior
+	d := time.Date(2026, 9, 14, 15, 4, 5, 0, time.Local)
+	zero := time.Time{}
+	tests := []struct {
+		name     string
+		t        *time.Time
+		expected string
+	}{
+		{"nil", nil, ""},
+		{"zero", &zero, ""},
+		{"valid", &d, "14.09.2026 15:04:05"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatDateTime(tt.t); got != tt.expected {
+				t.Errorf("formatDateTime() = %v, want %v", got, tt.expected)
 			}
 		})
 	}

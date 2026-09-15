@@ -45,21 +45,32 @@ var statusCmd = &cobra.Command{
 
 		var header table.Row
 		if wide {
-			header = table.Row{"CONTEXT", "PROJECT", "CONFIG", "NAME", "STATE", "UPTIME", "SHUTDOWN", "RUNNING T/O", "IDLE T/O"}
+			header = table.Row{
+				"CONTEXT",
+				"PROJECT",
+				"CONFIG",
+				"NAME",
+				"STATE",
+				"UPTIME",
+				"SHUTDOWN",
+				"RUNNING T/O",
+				"IDLE T/O",
+				"LAST UPDATED",
+			}
 		} else {
 			header = table.Row{"CONTEXT", "NAME", "STATE", "UPTIME", "SHUTDOWN"}
 		}
 		rows := make([]table.Row, 0, len(states))
 		for _, s := range states {
 			contextName := formatContext(s.Context, cfg.CurrentContextName)
-			shutdown := formatExpectedShutdown(s.ExpectedShutdown)
+			shutdown := formatTime(s.ExpectedShutdown)
 			if s.RunningTimeout == nil || *s.RunningTimeout == 0 {
 				shutdown = ""
 			}
 			if wide {
 				rows = append(rows, table.Row{
 					contextName, s.Project, s.Config, s.Name, formatState(s.State), formatUptime(s.Uptime),
-					shutdown, formatUptime(s.RunningTimeout), formatUptime(s.IdleTimeout),
+					shutdown, formatUptime(s.RunningTimeout), formatUptime(s.IdleTimeout), formatDateTime(s.LastUpdated),
 				})
 			} else {
 				rows = append(
@@ -186,12 +197,20 @@ func formatUptime(u *time.Duration) string {
 	return sb.String()
 }
 
-func formatExpectedShutdown(t *time.Time) string {
+func formatTime(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	//nolint:gosmopolitan // Display expected shutdown time in the user's local timezone
-	return t.Local().Format("15:04:05")
+	//nolint:gosmopolitan // Display time in the user's local timezone
+	return t.Local().Format(time.TimeOnly)
+}
+
+func formatDateTime(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return ""
+	}
+	//nolint:gosmopolitan // Display time in the user's local timezone
+	return t.Local().Format("02.01.2006 15:04:05")
 }
 
 func init() {
