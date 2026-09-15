@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
 
 	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
@@ -30,6 +31,10 @@ func (m Model) Init() tea.Cmd {
 		}
 	})
 
+	if m.Config != nil {
+		m.Config.InitAuthChannels()
+	}
+
 	return tea.Batch(
 		func() tea.Msg {
 			_, err := gcloud.Login(context.Background(), m.Config)
@@ -39,6 +44,7 @@ func (m Model) Init() tea.Cmd {
 			return loginMsg{}
 		},
 		m.waitForLog(),
+		m.waitForAuthURL(),
 	)
 }
 
@@ -52,8 +58,30 @@ func (m Model) waitForLog() tea.Cmd {
 	}
 }
 
+func (m Model) waitForAuthURL() tea.Cmd {
+	return func() tea.Msg {
+		if m.Config == nil || m.Config.AuthURLChan == nil {
+			return nil
+		}
+		url, ok := <-m.Config.AuthURLChan
+		if !ok {
+			return nil
+		}
+		return authURLMsg(url)
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case authURLMsg:
+		m.AuthURL = string(msg)
+		var cmds []tea.Cmd
+		cmds = append(cmds, m.waitForAuthURL())
+		_ = clipboard.WriteAll(m.AuthURL)
+		m.CopiedToClipboard = true
+		m.ClipboardMsg = "✓ Auth URL automatically copied to clipboard!"
+		cmds = append(cmds, tea.SetClipboard(m.AuthURL))
+		return m, tea.Batch(cmds...)
 	case loginMsg:
 		m.Step = stepProject
 		m.StatusMessage = "Fetching projects..."
@@ -91,9 +119,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.Step == stepLogin {
-		if key, ok := msg.(tea.KeyPressMsg); ok && (key.String() == "ctrl+c" || key.String() == "esc") {
-			m.Aborted = true
-			return m, tea.Quit
+		if key, ok := msg.(tea.KeyPressMsg); ok {
+			switch key.String() {
+			case "ctrl+c", "esc":
+				m.Aborted = true
+				return m, tea.Quit
+			case "ctrl+y":
+				if m.AuthURL != "" {
+					_ = clipboard.WriteAll(m.AuthURL)
+					m.CopiedToClipboard = true
+					m.ClipboardMsg = "✓ Auth URL copied to clipboard!"
+					return m, tea.SetClipboard(m.AuthURL)
+				}
+				return m, nil
+			}
 		}
 		return m, nil
 	}

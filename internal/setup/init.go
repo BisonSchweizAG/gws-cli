@@ -12,8 +12,12 @@ import (
 )
 
 func InitialModel(cfg *types.Config) Model {
+	if cfg != nil {
+		cfg.InitAuthChannels()
+	}
+
 	fi := textinput.New()
-	fi.Placeholder = "Filter..."
+	fi.Placeholder = "Search projects or workstations..."
 	fi.SetWidth(100)
 	fi.Focus()
 
@@ -44,6 +48,9 @@ func InitialModel(cfg *types.Config) Model {
 				context = c
 			}
 		}
+	}
+	if context.GCloud == nil {
+		context.GCloud = &types.GCloud{}
 	}
 
 	fp := filepicker.New()

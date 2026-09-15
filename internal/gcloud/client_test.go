@@ -250,6 +250,8 @@ func Test_waitForWorkstationRunning_TimeoutErrorLogging(t *testing.T) {
 	log.SetLogger(func(msg string) {
 		loggedMessages = append(loggedMessages, msg)
 	})
+	defer log.SetLogger(log.Stdout)
+	loggedMessages = nil
 
 	log.Logf("Error waiting for workstation to start: %v", err)
 

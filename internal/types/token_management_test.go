@@ -5,10 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
 
 func TestTokenManagement(t *testing.T) {
+	keyring.MockInit()
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
 

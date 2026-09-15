@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/atotto/clipboard"
 
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/types"
@@ -35,6 +36,11 @@ type Model struct {
 
 	SpinnerStopped bool
 
+	// Auth URL and Clipboard support
+	AuthURL           string
+	CopiedToClipboard bool
+	ClipboardMsg      string
+
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
 
@@ -53,7 +59,7 @@ func NewModel(ctx context.Context, cfg *types.Config, title string, operation fu
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	s.Style = lipgloss.NewStyle().Foreground(HotPink)
 
 	return &Model{
 		Config:    cfg,
@@ -81,18 +87,23 @@ func (m *Model) LastLog() string {
 }
 
 type (
-	logMsg    string
-	errMsg    struct{ err error }
-	opDoneMsg struct{}
+	logMsg     string
+	authURLMsg string
+	errMsg     struct{ err error }
+	opDoneMsg  struct{}
 )
 
 func (m *Model) Init() tea.Cmd {
-	log.SetLogger(func(log string) {
+	log.SetLogger(func(l string) {
 		select {
-		case m.LogChan <- log:
+		case m.LogChan <- l:
 		default:
 		}
 	})
+
+	if m.Config != nil {
+		m.Config.InitAuthChannels()
+	}
 
 	return tea.Batch(
 		func() tea.Msg {
@@ -103,6 +114,7 @@ func (m *Model) Init() tea.Cmd {
 			return opDoneMsg{}
 		},
 		m.waitForLog(),
+		m.waitForAuthURL(),
 		m.Spinner.Tick,
 	)
 }
@@ -117,6 +129,19 @@ func (m *Model) waitForLog() tea.Cmd {
 	}
 }
 
+func (m *Model) waitForAuthURL() tea.Cmd {
+	return func() tea.Msg {
+		if m.Config == nil || m.Config.AuthURLChan == nil {
+			return nil
+		}
+		url, ok := <-m.Config.AuthURLChan
+		if !ok {
+			return nil
+		}
+		return authURLMsg(url)
+	}
+}
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
@@ -128,9 +153,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.Done {
 			return m, tea.Quit
 		}
+		if m.AuthURL != "" && msg.String() == "ctrl+y" {
+			_ = clipboard.WriteAll(m.AuthURL)
+			m.CopiedToClipboard = true
+			m.ClipboardMsg = "✓ Auth URL copied to clipboard!"
+			return m, tea.SetClipboard(m.AuthURL)
+		}
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+	case authURLMsg:
+		m.AuthURL = string(msg)
+		var cmds []tea.Cmd
+		cmds = append(cmds, m.waitForAuthURL())
+		_ = clipboard.WriteAll(m.AuthURL)
+		m.CopiedToClipboard = true
+		m.ClipboardMsg = "✓ Auth URL automatically copied to clipboard!"
+		cmds = append(cmds, tea.SetClipboard(m.AuthURL))
+		return m, tea.Batch(cmds...)
 	case logMsg:
 		if string(msg) == StopSpinner {
 			m.SpinnerStopped = true
@@ -163,15 +203,26 @@ func (m *Model) View() tea.View {
 		return tea.NewView("")
 	}
 
-	var left strings.Builder
+	frameSize := m.Styles.Border.GetHorizontalFrameSize()
+	innerWidth := max(m.Width-4-frameSize, 60)
 
-	left.WriteString(m.Styles.Title.Render(m.Title))
+	var left strings.Builder
+	badge := m.Styles.Badge.Render(" GWS ")
+	title := m.Styles.Title.Render(m.Title)
+	left.WriteString(lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title))
 	left.WriteString("\n\n")
 
-	currCtx := m.Config.CurrentContext()
-	fmt.Fprintf(&left, "  Version:     %s\n", version.Version)
-	fmt.Fprintf(&left, "  Config File: %s\n", m.Config.FilePath)
-	fmt.Fprintf(&left, "  Context:     %s\n", m.Styles.Success.Render(m.Config.CurrentContextName))
+	var currCtx *types.Context
+	if m.Config != nil {
+		currCtx = m.Config.CurrentContext()
+	}
+	fmt.Fprintf(&left, "  Version:     %s\n", m.Styles.Info.Render(version.Version))
+	if m.Config != nil && m.Config.FilePath != "" {
+		fmt.Fprintf(&left, "  Config File: %s\n", m.Config.FilePath)
+	}
+	if m.Config != nil && m.Config.CurrentContextName != "" {
+		fmt.Fprintf(&left, "  Context:     %s\n", m.Styles.Success.Render(m.Config.CurrentContextName))
+	}
 	if currCtx != nil && currCtx.GCloud != nil {
 		fmt.Fprintf(&left, "  Workstation: %s\n", m.Styles.Success.Render(currCtx.GCloud.Name))
 	}
@@ -182,8 +233,6 @@ func (m *Model) View() tea.View {
 	logo := m.Styles.Logo.Render(strings.TrimRight(version.Logo, "\n"))
 	logoWidth := lipgloss.Width(logo)
 
-	frameSize := m.Styles.Border.GetHorizontalFrameSize()
-	innerWidth := m.Width - 4 - frameSize
 	leftContentWidth := lipgloss.Width(left.String())
 
 	var header string
@@ -197,23 +246,60 @@ func (m *Model) View() tea.View {
 
 	var b strings.Builder
 	b.WriteString(header)
+	b.WriteString("\n")
+
+	divider := m.Styles.Divider.Render(strings.Repeat("─", max(innerWidth, 40)))
+	b.WriteString(divider)
 	b.WriteString("\n\n")
 
-	if m.Err != nil {
-		b.WriteString(m.Styles.ErrText.Render(fmt.Sprintf("Error: %v", m.Err)))
+	if m.AuthURL != "" {
+		var authCard strings.Builder
+		authCard.WriteString(m.Styles.Badge.Background(Indigo).Render(" 🔐 AUTHENTICATION REQUIRED "))
+		authCard.WriteString("\n\n")
+		authCard.WriteString(m.Styles.Info.Render("Opening Google Cloud authentication in your default browser..."))
+		authCard.WriteString("\n")
+		authCard.WriteString(m.Styles.Help.Render("If your browser did not open automatically, copy and open the link below:"))
+		authCard.WriteString("\n\n")
+
+		authBoxWidth := max(innerWidth-6, 40)
+		urlContent := m.Styles.URLBox.Width(authBoxWidth).Render(m.AuthURL)
+		authCard.WriteString(urlContent)
+		authCard.WriteString("\n\n")
+
+		if m.ClipboardMsg != "" {
+			authCard.WriteString(m.Styles.Success.Render(m.ClipboardMsg))
+		} else {
+			authCard.WriteString(m.Styles.Help.Render("Tip: Press Ctrl+Y to copy URL to clipboard"))
+		}
+		authCard.WriteString("\n\n")
+
+		authCard.WriteString(m.Styles.Help.Render("Waiting for authentication in browser..."))
+		authCard.WriteString("\n")
+
+		cardRendered := m.Styles.Card.Width(innerWidth).Render(authCard.String())
+		b.WriteString(cardRendered)
 		b.WriteString("\n\n")
 	}
 
-	b.WriteString(m.Styles.Info.Render("Logs:"))
+	if m.Err != nil {
+		b.WriteString(m.Styles.ErrText.Render(fmt.Sprintf("🚨 Error: %v", m.Err)))
+		b.WriteString("\n\n")
+	}
+
+	logsHeader := fmt.Sprintf("📋 Activity Logs (%d)", len(m.Logs))
+	b.WriteString(m.Styles.Info.Bold(true).Render(logsHeader))
 	b.WriteString("\n")
 
 	if len(m.Logs) > 0 {
 		start := 0
-		reservedHeight := max(10, 7+len(m.Headers)) + 7
+		reservedHeight := max(10, 7+len(m.Headers)) + 8
+		if m.AuthURL != "" {
+			reservedHeight += 11
+		}
 		if m.Err != nil {
 			reservedHeight += 2
 		}
-		availableHeight := max(m.Height-reservedHeight, 5)
+		availableHeight := max(m.Height-reservedHeight, 4)
 
 		if len(m.Logs) > availableHeight {
 			start = len(m.Logs) - availableHeight
@@ -236,15 +322,21 @@ func (m *Model) View() tea.View {
 			b.WriteString(m.Spinner.View())
 			b.WriteString(" ")
 		}
-		b.WriteString("Waiting for logs...")
+		b.WriteString(m.Styles.Help.Render("Waiting for logs..."))
 	}
 	b.WriteString("\n\n")
 
 	var help string
-	if m.Done {
-		help = m.Styles.Help.Render("press any key to quit")
-	} else {
-		help = m.Styles.Help.Render("ctrl+c: quit")
+	switch {
+	case m.AuthURL != "":
+		help = m.Styles.RenderHelpBar(
+			[2]string{"Ctrl+Y", "copy URL"},
+			[2]string{"Ctrl+C", "quit"},
+		)
+	case m.Done:
+		help = m.Styles.RenderHelpBar([2]string{"Any key", "quit"})
+	default:
+		help = m.Styles.RenderHelpBar([2]string{"Ctrl+C", "quit"})
 	}
 	b.WriteString(help)
 
