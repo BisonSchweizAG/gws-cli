@@ -74,8 +74,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y osslsigncode && env
 
       - name: Test Release
-        run: make test-release
+        run: make test-release-ci
         env:
+          GOOGLE_OIDC_CLIENT_ID: ${{ secrets.GOOGLE_OIDC_CLIENT_ID }}
+          GOOGLE_OIDC_CLIENT_SECRET: ${{ secrets.GOOGLE_OIDC_CLIENT_SECRET }}
           SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
           SIGNING_CERT_PFX: ${{ secrets.SIGNING_CERT_PFX }}
 
