@@ -59,8 +59,8 @@ func InitialModel(cfg *types.Config) Model {
 	fp.KeyMap.Back.SetKeys("backspace") // Explicitly set key for going up a directory
 	fp.KeyMap.Open.SetKeys("enter")     // Explicitly set key for going down into a directory
 	startDir := ""
-	if context.PrivateKeyFile != "" {
-		startDir = filepath.Dir(context.PrivateKeyFile)
+	if context.KnownHostsFile != "" {
+		startDir = filepath.Dir(context.KnownHostsFile)
 	} else if userHomeDir != "" {
 		startDir = filepath.Join(userHomeDir, ".ssh")
 	}
@@ -100,14 +100,6 @@ func InitialModel(cfg *types.Config) Model {
 				t.SetValue(context.User)
 			} else {
 				t.SetValue("user")
-			}
-		case PrivateKeyFile:
-			m.Inputs[i].Label = "Private Key File"
-			t.CharLimit = 128
-			if context.PrivateKeyFile != "" {
-				t.SetValue(context.PrivateKeyFile)
-			} else if userHomeDir != "" {
-				t.SetValue(filepath.Join(userHomeDir, ".ssh", "id_ed25519"))
 			}
 		case KnownHostsFile:
 			m.Inputs[i].Label = "Known Hosts File (optional)"

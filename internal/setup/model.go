@@ -13,7 +13,6 @@ const (
 	ContextName focusable = iota
 	Port
 	User
-	PrivateKeyFile
 	KnownHostsFile
 	GcloudProject
 	GcloudAccount

@@ -132,7 +132,7 @@ func (m Model) View() tea.View {
 
 	if m.FilePickerActive {
 		stepPill := m.Styles.StepIndicator.Render(" FILE PICKER ")
-		title := m.Styles.Title.Render("Select SSH Key or Known Hosts File")
+		title := m.Styles.Title.Render("Select SSH Known Hosts File")
 		b.WriteString(lipgloss.JoinHorizontal(lipgloss.Center, stepPill, "  ", title))
 		b.WriteString("\n")
 		b.WriteString(m.Styles.Divider.Render(strings.Repeat("─", max(innerWidth, 40))))
@@ -184,7 +184,7 @@ func (m Model) View() tea.View {
 		[2]string{"Up/Down", "navigate"},
 		[2]string{"Enter", "confirm"},
 	)
-	if m.Focused == PrivateKeyFile || m.Focused == KnownHostsFile {
+	if m.Focused == KnownHostsFile {
 		helpItems = append(helpItems, [2]string{"Ctrl+F", "file picker"})
 	}
 	helpItems = append(helpItems, [2]string{"Esc", "quit"})
