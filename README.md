@@ -20,11 +20,13 @@ A command-line tool to manage Google Cloud Workstations.
 
 ## Description
 
-`gws` is a utility to simplify the management of Google Cloud Workstations. It provides commands to start, stop, and connect to your workstation, as well as manage your configuration.
+`gws` is a utility to simplify the management of Google Cloud Workstations. It provides commands to start, stop, and
+connect to your workstation, as well as manage your configuration.
 
 ## Installation
 
-You can install `gws` by downloading a binary from the [latest release]( https://github.com/bisonschweizag/gws-cli/releases/tag/v0.2.0) or via go by using `go install`:
+You can install `gws` by downloading a binary from
+the [latest release]( https://github.com/bisonschweizag/gws-cli/releases/tag/v0.2.0) or via go by using `go install`:
 
 ```bash
 go install github.com/bisonschweizag/gws-cli@latest
@@ -34,7 +36,8 @@ go install github.com/bisonschweizag/gws-cli@latest
 
 ### Commands
 
-- `gws setup`: Create a new or update the config.yaml and create a context configuration using an interactive terminal setup wizard.
+- `gws setup`: Create a new or update the config.yaml and create a context configuration using an interactive terminal
+  setup wizard.
 - `gws start [context]`: Start the workstation for the given or current context.
 - `gws stop [context]`: Stop the workstation for the given or current context.
 - `gws restart [context]`: Restart the workstation for the given or current context.
@@ -43,7 +46,7 @@ go install github.com/bisonschweizag/gws-cli@latest
 - `gws down`: Download files and directories from the workstation as defined in the context configuration.
 - `gws tunnel [context]`: Create an SSH tunnel to the workstation.
 - `gws ctx [context]`: Switch the current context. If no context is provided, an interactive selection is shown.
-  - `--current`: Print the current active context.
+    - `--current`: Print the current active context.
 - `gws scripts win-reconnect-ssh`: Generate a Windows SSH reconnect script.
 - `gws scripts bash-reconnect-ssh`: Generate a Bash SSH reconnect script.
 
@@ -54,9 +57,11 @@ go install github.com/bisonschweizag/gws-cli@latest
 
 ## Configuration
 
-`gws` is configured using a YAML file (default: `~/.config/gws/config.yaml`). You can use the `gws setup` command to create an initial configuration.
+`gws` is configured using a YAML file (default: `~/.config/gws/config.yaml`). You can use the `gws setup` command to
+create an initial configuration.
 
-The configuration file can contain multiple contexts. Each context defines the connection details for a specific workstation.
+The configuration file can contain multiple contexts. Each context defines the connection details for a specific
+workstation.
 
 ### `config.yaml` example
 
@@ -70,9 +75,9 @@ contexts:
     privateKeyFile: /path/to/your/private/key
     knownHostsFile: /path/to/your/known_hosts
     postConnectCommand: # open 'GWS' profile in a new Windows Terminal Tab
-     - 'wt'
-     - '--window=0'
-     - '--profile=GWS'
+      - 'wt'
+      - '--window=0'
+      - '--profile=GWS'
     gcloud:
       project: my-project
       account: user@example.com
@@ -81,13 +86,13 @@ contexts:
       config: my-workstation-config
       name: my-workstation
     dirs:
-    - path: /home/user/.ssh
-      permissions: "0700"
+      - path: /home/user/.ssh
+        permissions: "0700"
     files:
-    - sourcePath: /path/to/your/file
-      path: /home/user/file
-      permissions: "0644"
-      direction: up
+      - sourcePath: /path/to/your/file
+        path: /home/user/file
+        permissions: "0644"
+        direction: up
 chromeBrowser:
   executablePath: C:\Program Files\Google\Chrome\Application\chrome.exe
   profileDirectory: Profile X
@@ -99,32 +104,77 @@ jetbrainsGateway:
 
 - `currentContext`: The name of the currently active context.
 - `contexts`: A map of contexts.
-  - `<context-name>`:
-    - `host`: The hostname or IP address of the workstation.
-    - `port`: The port to connect to.
-    - `user`: The username to use for the SSH connection.
-    - `privateKeyFile`: The path to the private key for the SSH connection.
-    - `knownHostsFile`: The path to the known hosts file for the SSH connection.
-    - `postConnectCommand`: Optional command and arguments to start after the tunnel is opened. The first item is the executable, and the remaining items are passed as arguments.
-    - `gcloud`: The Google Cloud configuration.
-      - `project`: The Google Cloud project.
-      - `account`: The Google Cloud account (email, optional).
-      - `region`: The Google Cloud region.
-      - `cluster`: The Google Cloud cluster.
-      - `config`: The workstation configuration.
-      - `name`: The name of the workstation.
-    - `dirs`: A list of directories to create on the workstation.
-      - `path`: The path of the directory.
-      - `permissions`: The permissions of the directory.
-    - `files`: A list of files to upload to the workstation.
-      - `sourcePath`: The path of the local file.
-      - `path`: The path of the remote file.
-      - `permissions`: The permissions of the remote file.
-      - `direction`: The direction (up / down) the file is copied.
+    - `<context-name>`:
+        - `host`: The hostname or IP address of the workstation.
+        - `port`: The port to connect to.
+        - `user`: The username to use for the SSH connection.
+        - `privateKeyFile`: The path to the private key for the SSH connection.
+        - `knownHostsFile`: The path to the known hosts file for the SSH connection.
+        - `postConnectCommand`: Optional command and arguments to start after the tunnel is opened. The first item is
+          the executable, and the remaining items are passed as arguments.
+        - `gcloud`: The Google Cloud configuration.
+            - `project`: The Google Cloud project.
+            - `account`: The Google Cloud account (email, optional).
+            - `region`: The Google Cloud region.
+            - `cluster`: The Google Cloud cluster.
+            - `config`: The workstation configuration.
+            - `name`: The name of the workstation.
+        - `dirs`: A list of directories to create on the workstation.
+            - `path`: The path of the directory.
+            - `permissions`: The permissions of the directory.
+        - `files`: A list of files to upload to the workstation.
+            - `sourcePath`: The path of the local file.
+            - `path`: The path of the remote file.
+            - `permissions`: The permissions of the remote file.
+            - `direction`: The direction (up / down) the file is copied.
 - `sshTimeoutSeconds`: Optional SSH connection timeout in seconds (default: `30`).
 - `startTimeoutSeconds`: Optional workstation start timeout in seconds (default: `300`).
 - `chromeBrowser`: Optional Chrome browser configuration.
-  - `executablePath`: The path to the Chrome executable.
-  - `profileDirectory`: The Chrome profile directory to use. (check profile dir by opening `chrome://version` in chrome)
+    - `executablePath`: The path to the Chrome executable.
+    - `profileDirectory`: The Chrome profile directory to use. (check profile dir by opening `chrome://version` in
+      chrome)
 - `jetbrainsGateway`: Optional JetBrains Gateway configuration.
-  - `downloadDestination`: The directory where JetBrains programs are downloaded.
+    - `downloadDestination`: The directory where JetBrains programs are downloaded.
+
+## Setup in JetBrains Gateway
+
+1. Create a new SSH Connection  
+   ![Gateway Homescreen](docs/gateway-ssh-new-home.png "Gateway Homescreen")
+
+2. Configure the SSH Connection
+
+- Username: `user`
+- Host: `localhost`
+- Port: port configured for your gws context
+
+![Gateway SSH Connection](docs/gateway-ssh-new-connection.png "Gateway SSH Connection")
+
+## Integrate into Windows Terminal
+
+1. Generate an SSH Start Script for Windows
+
+The generated script automatically reconnects to the Workstation if the tunnel is re-opened.
+
+```text
+# dry run
+gws scripts win-reconnect-ssh
+
+# save the file to %HOME%\.config\gws\win-reconnect-ssh.bat
+gws scripts win-reconnect-ssh -s
+```
+
+This saves a cmd file in `%HOME%\.config\gws\`.
+
+2. Create a new Profile in Windows Terminal, giving it a name and select the cmd file as executable.
+   ![New Windows Terminal Profile](docs/windows-terminal-profile.png "New Windows Terminal Profile")
+
+3. Configure the new profile in the postConnectCommand of your context in `%HOME%\.config\gws\config.yaml`.
+
+```yaml
+contexts:
+  my-workstation:
+    postConnectCommand: # open 'GWS PROD' profile in a new Windows Terminal Tab
+      - 'wt'
+      - '--window=0'
+      - '--profile=GWS PROD'
+```
