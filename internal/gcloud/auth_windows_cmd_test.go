@@ -12,7 +12,7 @@ func TestWindowsCmd_Default(t *testing.T) {
 	authURL := "https://accounts.google.com/o/oauth2/auth"
 
 	cmd := windowsCmd(ctx, nil, authURL)
-	expectedArgs := []string{"cmd.exe", "/c", "start", "", authURL}
+	expectedArgs := []string{"rundll32.exe", "url.dll,FileProtocolHandler", authURL}
 	if !slices.Equal(cmd.Args, expectedArgs) {
 		t.Errorf("expected args %v, got %v", expectedArgs, cmd.Args)
 	}
