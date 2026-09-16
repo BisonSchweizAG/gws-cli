@@ -178,3 +178,16 @@ contexts:
       - '--window=0'
       - '--profile=GWS PROD'
 ```
+
+## Windows SmartScreen
+
+On some systems, Windows SmartScreen may block the execution of the gws.exe. To allow the gws to run, verify you have
+downloaded it from this repository and verify the file is signed by gws certificate `gws-cli.bison-group.com`.
+
+![SmartScreen Lock](docs/windows-smart-screen.png "SmartScreen Lock")
+
+If this is the case, right-click on the gws.exe file and select `Properties` / `Eigenschaften`.
+
+In the `Properties` / `Eigenschaften` dialog, click on the `Unblock` / `Zulassen` button.
+
+![Unblock](docs/windows-properties.png "Unblock")
