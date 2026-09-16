@@ -125,10 +125,17 @@ func (c *Config) Load(fileName string) error {
 
 	c.FilePath = file
 
+	currentChanged := false
+	if _, ok := c.Contexts[c.CurrentContextName]; !ok {
+		c.CurrentContextName = ""
+		currentChanged = true
+	}
+
 	if c.CurrentContextName == "" {
 		if len(c.Contexts) == 1 {
 			for k := range maps.Keys(c.Contexts) {
 				c.CurrentContextName = k
+				currentChanged = true
 			}
 		}
 	}
@@ -147,7 +154,7 @@ func (c *Config) Load(fileName string) error {
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	return c.SwitchContext(c.CurrentContextName, false)
+	return c.SwitchContext(c.CurrentContextName, currentChanged)
 }
 
 func (c *Config) applyDefaults() {
