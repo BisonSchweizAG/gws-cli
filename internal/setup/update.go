@@ -160,7 +160,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		if (m.Focused == PrivateKeyFile || m.Focused == KnownHostsFile) && msg.String() == "ctrl+f" {
+		if (m.Focused == KnownHostsFile) && msg.String() == "ctrl+f" {
 			m.FilePickerActive = true
 			m.FilePickerField = m.Focused
 			m.StatusMessage = ""
@@ -255,15 +255,6 @@ func (m Model) validateAndSubmit() (tea.Model, tea.Cmd) {
 			m.StatusMessage = fmt.Sprintf("Error: %s is a required field.", m.Inputs[i].Label)
 			return m, nil
 		}
-	}
-
-	privateKeyFile := m.Inputs[PrivateKeyFile].Value()
-	if st, err := os.Stat(privateKeyFile); os.IsNotExist(err) {
-		m.StatusMessage = "Error: private key file does not exist: " + privateKeyFile
-		return m, nil
-	} else if st.IsDir() {
-		m.StatusMessage = "Error: private key must not be directory: " + privateKeyFile
-		return m, nil
 	}
 
 	knownHostsFile := m.Inputs[KnownHostsFile].Value()

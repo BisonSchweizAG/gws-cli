@@ -24,7 +24,6 @@ func SaveConfig(m Model) error {
 	}
 	newCtx.Port = portVal
 	newCtx.User = m.Inputs[User].Value()
-	newCtx.PrivateKeyFile = m.Inputs[PrivateKeyFile].Value()
 	newCtx.KnownHostsFile = m.Inputs[KnownHostsFile].Value()
 
 	if newCtx.GCloud == nil {
