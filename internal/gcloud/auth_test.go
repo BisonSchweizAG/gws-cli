@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bisonschweizag/gws-cli/icon"
+	"github.com/bisonschweizag/gws-cli/docs/icon"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
@@ -28,6 +28,9 @@ func TestCallbackHTML(t *testing.T) {
 	}
 	if !strings.Contains(html, `content="light dark"`) {
 		t.Error("expected callbackHTML to declare light dark color-scheme meta")
+	}
+	if !strings.Contains(html, "icon.ico") {
+		t.Error("expected callbackHTML to link icon.ico as favicon")
 	}
 }
 

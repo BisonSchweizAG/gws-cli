@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>gws CLI Remote Login</title>
+    <link rel="icon" type="image/x-icon" href="../icon/icon.ico">
+    <style>
+        :root{
+            --gc-blue:#1a73e8;
+            --gc-blue-dark:#174ea6;
+            --gc-text:#202124;
+            --gc-text-secondary:#5f6368;
+            --gc-border:#dadce0;
+            --gc-bg:#f8f9fa;
+            --gc-card:#ffffff;
+            --gc-danger:#d93025;
+            --gc-danger-bg:#fce8e6;
+            --gc-danger-border:#f6aea9;
+            --gc-code-bg:#f1f3f4;
+            --gc-success:#188038;
+            --gc-btn-text:#ffffff;
+            --gc-shadow:0 1px 2px rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --gc-blue:#8ab4f8;
+                --gc-blue-dark:#aecbfa;
+                --gc-text:#e8eaed;
+                --gc-text-secondary:#9aa0a6;
+                --gc-border:#3c4043;
+                --gc-bg:#202124;
+                --gc-card:#292a2d;
+                --gc-danger:#f28b82;
+                --gc-danger-bg:rgba(242,139,130,0.12);
+                --gc-danger-border:#5c2b29;
+                --gc-code-bg:#35363a;
+                --gc-success:#81c995;
+                --gc-btn-text:#202124;
+                --gc-shadow:0 1px 2px rgba(0,0,0,.6),0 1px 3px 1px rgba(0,0,0,.3);
+            }
+        }
+        *{box-sizing:border-box;}
+        html,body{height:100%;}
+        body{
+            margin:0;
+            font-family:"Google Sans","Helvetica Neue",Arial,sans-serif;
+            background:var(--gc-bg);
+            color:var(--gc-text);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            min-height:100vh;
+            padding:24px;
+        }
+        .card{
+            background:var(--gc-card);
+            border:1px solid var(--gc-border);
+            border-radius:8px;
+            max-width:480px;
+            width:100%;
+            padding:40px 40px 32px;
+            box-shadow:var(--gc-shadow);
+        }
+        .logo{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            margin-bottom:24px;
+        }
+        .logo img,.logo svg{width:28px;height:28px;flex-shrink:0;}
+        .logo span{
+            font-size:15px;
+            font-weight:500;
+            color:var(--gc-text-secondary);
+        }
+        h1{
+            font-size:22px;
+            font-weight:400;
+            margin:0 0 16px;
+            color:var(--gc-text);
+        }
+        p{
+            font-size:14px;
+            line-height:1.6;
+            color:var(--gc-text-secondary);
+            margin:0 0 16px;
+        }
+        code.inline{
+            background:var(--gc-code-bg);
+            border-radius:4px;
+            padding:2px 6px;
+            font-family:"Roboto Mono",Consolas,Menlo,monospace;
+            font-size:13px;
+            color:var(--gc-text);
+        }
+        .code-box{
+            margin:20px 0 8px;
+            display:none;
+        }
+        .code-box.show{display:block;}
+        .code-label{
+            font-size:12px;
+            font-weight:500;
+            color:var(--gc-text-secondary);
+            text-transform:uppercase;
+            letter-spacing:.4px;
+            margin-bottom:6px;
+        }
+        .code-row{
+            display:flex;
+            align-items:stretch;
+            border:1px solid var(--gc-border);
+            border-radius:6px;
+            overflow:hidden;
+        }
+        .code-value{
+            flex:1;
+            padding:14px 16px;
+            font-family:"Roboto Mono",Consolas,Menlo,monospace;
+            font-size:15px;
+            word-break:break-all;
+            background:var(--gc-code-bg);
+            color:var(--gc-text);
+            user-select:all;
+        }
+        .copy-btn{
+            border:none;
+            background:var(--gc-blue);
+            color:var(--gc-btn-text);
+            padding:0 20px;
+            font-size:14px;
+            font-weight:500;
+            font-family:inherit;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            gap:6px;
+            transition:background .15s ease;
+            white-space:nowrap;
+        }
+        .copy-btn:hover{background:var(--gc-blue-dark);}
+        .copy-btn:active{background:var(--gc-blue-dark);}
+        .copy-btn svg{width:16px;height:16px;}
+        .copy-feedback{
+            font-size:13px;
+            color:var(--gc-success);
+            height:18px;
+            margin-top:8px;
+            visibility:hidden;
+        }
+        .copy-feedback.show{visibility:visible;}
+        .footer{
+            margin-top:24px;
+            font-size:13px;
+            color:var(--gc-text-secondary);
+        }
+        .error-box{
+            background:var(--gc-danger-bg);
+            border:1px solid var(--gc-danger-border);
+            border-radius:6px;
+            padding:14px 16px;
+            color:var(--gc-danger);
+            font-size:14px;
+            margin:20px 0 8px;
+            display:none;
+        }
+        .error-box.show{display:block;}
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="logo">
+        <img src="../icon/icon.svg" alt="gws cli">
+        <span>gws CLI</span>
+    </div>
+
+    <h1>Sign in to the gws CLI</h1>
+
+    <p>
+        You are seeing this page because you ran the following command in the
+        gws CLI from this or another machine. If this is not the case, close this tab.
+    </p>
+    <p><code class="inline">gws start --no-launch-browser</code></p>
+
+    <p id="instructions">
+        Enter the following verification code in gws CLI on the machine
+        you want to log into. This is a credential <strong>similar to your
+        password</strong> and should not be shared with others.
+    </p>
+
+    <div class="code-box" id="code-box">
+        <div class="code-label">Verification code</div>
+        <div class="code-row">
+            <div class="code-value" id="code-value"></div>
+            <button class="copy-btn" id="copy-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
+                Copy
+            </button>
+        </div>
+        <div class="copy-feedback" id="copy-feedback">Copied to clipboard</div>
+    </div>
+
+    <div class="error-box" id="error-box">
+        No verification code was found in the URL. Make sure you opened the
+        exact link printed by <code class="inline">gws start --no-launch-browser</code>,
+        or close this tab and try again.
+    </div>
+
+    <p class="footer" id="footer" style="display:none;">You can close this tab when you're done.</p>
+</div>
+
+<script>
+    (function () {
+        // Extract the `code` query parameter client-side, the same way the
+        // real sdk.cloud.google.com/authcode.html page does, since a static
+        // host (e.g. GitHub Pages) can't run server-side logic.
+        var params = new URLSearchParams(window.location.search);
+        var code = params.get('code');
+
+        var codeBox = document.getElementById('code-box');
+        var errorBox = document.getElementById('error-box');
+        var instructions = document.getElementById('instructions');
+        var footer = document.getElementById('footer');
+        var codeEl = document.getElementById('code-value');
+
+        if (code) {
+            // textContent (not innerHTML) so the value can never be interpreted
+            // as markup, even though it comes straight from the URL.
+            codeEl.textContent = code;
+            codeBox.classList.add('show');
+            footer.style.display = 'block';
+
+            var btn = document.getElementById('copy-btn');
+            var feedback = document.getElementById('copy-feedback');
+            btn.addEventListener('click', function () {
+                function showFeedback() {
+                    feedback.classList.add('show');
+                    setTimeout(function () { feedback.classList.remove('show'); }, 2000);
+                }
+                function fallbackCopy() {
+                    var range = document.createRange();
+                    range.selectNode(codeEl);
+                    var sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    try { document.execCommand('copy'); } catch (e) { /* no-op */ }
+                    sel.removeAllRanges();
+                    showFeedback();
+                }
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(codeEl.textContent).then(showFeedback, fallbackCopy);
+                } else {
+                    fallbackCopy();
+                }
+            });
+        } else {
+            instructions.style.display = 'none';
+            errorBox.classList.add('show');
+        }
+    })();
+</script>
+</body>
+</html>

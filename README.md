@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icon/icon.svg" alt="GWS Icon" width="100"/>
+  <img src="docs/icon/icon.svg" alt="GWS Icon" width="100"/>
 </div>
 
 # gws - Google Cloud Workstation CLI

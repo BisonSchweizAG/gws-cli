@@ -2,45 +2,104 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <title>gws Google Authentication Successful</title>
+    <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/BisonSchweizAG/gws-cli/refs/heads/main/icon/icon.ico">
     <style>
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #1a1a1a;
-            --muted-color: #666666;
+        :root{
+            --gc-blue:#1a73e8;
+            --gc-blue-dark:#174ea6;
+            --gc-text:#202124;
+            --gc-text-secondary:#5f6368;
+            --gc-border:#dadce0;
+            --gc-bg:#f8f9fa;
+            --gc-card:#ffffff;
+            --gc-danger:#d93025;
+            --gc-danger-bg:#fce8e6;
+            --gc-danger-border:#f6aea9;
+            --gc-code-bg:#f1f3f4;
+            --gc-success:#188038;
+            --gc-btn-text:#ffffff;
+            --gc-shadow:0 1px 2px rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);
         }
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg-color: #1a1a1a;
-                --text-color: #f0f0f0;
-                --muted-color: #a0a0a0;
+                --gc-blue:#8ab4f8;
+                --gc-blue-dark:#aecbfa;
+                --gc-text:#e8eaed;
+                --gc-text-secondary:#9aa0a6;
+                --gc-border:#3c4043;
+                --gc-bg:#202124;
+                --gc-card:#292a2d;
+                --gc-danger:#f28b82;
+                --gc-danger-bg:rgba(242,139,130,0.12);
+                --gc-danger-border:#5c2b29;
+                --gc-code-bg:#35363a;
+                --gc-success:#81c995;
+                --gc-btn-text:#202124;
+                --gc-shadow:0 1px 2px rgba(0,0,0,.6),0 1px 3px 1px rgba(0,0,0,.3);
             }
         }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            text-align: center;
-            padding-top: 50px;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+        *{box-sizing:border-box;}
+        html,body{height:100%%;}
+        body{
+            margin:0;
+            font-family:"Google Sans","Helvetica Neue",Arial,sans-serif;
+            background:var(--gc-bg);
+            color:var(--gc-text);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            min-height:100vh;
+            padding:24px;
         }
-        .icon {
-            width: 128px;
-            height: 128px;
-            margin: 0 auto 20px auto;
+        .card{
+            background:var(--gc-card);
+            border:1px solid var(--gc-border);
+            border-radius:8px;
+            max-width:480px;
+            width:100%%;
+            padding:40px 40px 32px;
+            box-shadow:var(--gc-shadow);
         }
-        p {
-            color: var(--muted-color);
+        .logo{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            margin-bottom:24px;
+        }
+        .logo img,.logo svg{width:28px;height:28px;flex-shrink:0;}
+        .logo span{
+            font-size:15px;
+            font-weight:500;
+            color:var(--gc-text-secondary);
+        }
+        h1{
+            font-size:22px;
+            font-weight:400;
+            margin:0 0 16px;
+            color:var(--gc-text);
+        }
+        p{
+            font-size:14px;
+            line-height:1.6;
+            color:var(--gc-text-secondary);
+            margin:0 0 16px;
         }
     </style>
 </head>
 <body>
-<div class="icon">
-    %s
+<div class="card">
+    <div class="logo">
+        %s
+        <span>gws CLI</span>
+    </div>
+
+    <h1>gws Google Authentication Successful!</h1>
+
+    <p>You can now close this window and return to the tool.</p>
 </div>
-<h1>gws Google Authentication Successful!</h1>
-<p>You can now close this window and return to the tool.</p>
-<script>window.onload = function() { setTimeout(function() { window.close(); }, 1000); }</script>
+<script>window.onload = function() { setTimeout(function() { window.close(); }, 1000); };</script>
 </body>
 </html>
