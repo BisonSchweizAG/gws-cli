@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/atotto/clipboard"
 
+	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 	"github.com/bisonschweizag/gws-cli/version"
@@ -41,6 +43,10 @@ type Model struct {
 	CopiedToClipboard bool
 	ClipboardMsg      string
 
+	// Code input field for --no-launch-browser mode
+	CodeInput     textinput.Model
+	CodeSubmitted bool
+
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
 
@@ -54,6 +60,10 @@ type HeaderField struct {
 	Value string
 }
 
+func (m *Model) isNoLaunchBrowser() bool {
+	return (m.Config != nil && m.Config.NoLaunchBrowser) || gcloud.NoLaunchBrowser || gcloud.FlagNoLaunchBrowser
+}
+
 func NewModel(ctx context.Context, cfg *types.Config, title string, operation func(context.Context) error) *Model {
 	c, cancel := context.WithCancel(ctx)
 
@@ -61,15 +71,29 @@ func NewModel(ctx context.Context, cfg *types.Config, title string, operation fu
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(HotPink)
 
+	styles := DefaultStyles()
+
+	ci := textinput.New()
+	ci.Placeholder = "Enter verification code or paste callback URL..."
+	ci.CharLimit = 1024
+	ci.SetWidth(60)
+	cis := ci.Styles()
+	cis.Focused.Prompt = styles.InputFocused
+	cis.Focused.Text = styles.InputFocused
+	cis.Cursor.Color = styles.InputFocused.GetForeground()
+	ci.SetStyles(cis)
+	ci.Focus()
+
 	return &Model{
 		Config:    cfg,
 		Title:     title,
-		Styles:    DefaultStyles(),
+		Styles:    styles,
 		ctx:       c,
 		cancel:    cancel,
 		LogChan:   make(chan string, 100),
 		Operation: operation,
 		Spinner:   s,
+		CodeInput: ci,
 	}
 }
 
@@ -159,9 +183,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ClipboardMsg = "✓ Auth URL copied to clipboard!"
 			return m, tea.SetClipboard(m.AuthURL)
 		}
+		if m.AuthURL != "" && m.isNoLaunchBrowser() && !m.CodeSubmitted {
+			if msg.String() == "enter" {
+				val := strings.TrimSpace(m.CodeInput.Value())
+				if val != "" {
+					m.CodeSubmitted = true
+					m.CodeInput.Blur()
+					if m.Config != nil {
+						m.Config.SendAuthCode(val)
+					}
+					return m, nil
+				}
+			}
+			var cmd tea.Cmd
+			m.CodeInput, cmd = m.CodeInput.Update(msg)
+			return m, cmd
+		}
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		frameSize := m.Styles.Border.GetHorizontalFrameSize()
+		innerWidth := max(m.Width-4-frameSize, 60)
+		m.CodeInput.SetWidth(max(innerWidth-10, 30))
 	case authURLMsg:
 		m.AuthURL = string(msg)
 		var cmds []tea.Cmd
@@ -170,6 +213,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.CopiedToClipboard = true
 		m.ClipboardMsg = "✓ Auth URL automatically copied to clipboard!"
 		cmds = append(cmds, tea.SetClipboard(m.AuthURL))
+		if m.isNoLaunchBrowser() {
+			m.CodeInput.Focus()
+		}
 		return m, tea.Batch(cmds...)
 	case logMsg:
 		if string(msg) == StopSpinner {
@@ -256,25 +302,56 @@ func (m *Model) View() tea.View {
 		var authCard strings.Builder
 		authCard.WriteString(m.Styles.Badge.Background(Indigo).Render(" 🔐 AUTHENTICATION REQUIRED "))
 		authCard.WriteString("\n\n")
-		authCard.WriteString(m.Styles.Info.Render("Opening Google Cloud authentication in your default browser..."))
-		authCard.WriteString("\n")
-		authCard.WriteString(m.Styles.Help.Render("If your browser did not open automatically, copy and open the link below:"))
-		authCard.WriteString("\n\n")
 
-		authBoxWidth := max(innerWidth-6, 40)
-		urlContent := m.Styles.URLBox.Width(authBoxWidth).Render(m.AuthURL)
-		authCard.WriteString(urlContent)
-		authCard.WriteString("\n\n")
+		if m.isNoLaunchBrowser() {
+			authCard.WriteString(m.Styles.Info.Render("Browserless authentication mode (--no-launch-browser):"))
+			authCard.WriteString("\n")
+			authCard.WriteString(m.Styles.Help.Render("Open the URL below in your browser and enter the verification code:"))
+			authCard.WriteString("\n\n")
 
-		if m.ClipboardMsg != "" {
-			authCard.WriteString(m.Styles.Success.Render(m.ClipboardMsg))
+			authBoxWidth := max(innerWidth-6, 40)
+			urlContent := m.Styles.URLBox.Width(authBoxWidth).Render(m.AuthURL)
+			authCard.WriteString(urlContent)
+			authCard.WriteString("\n\n")
+
+			if m.ClipboardMsg != "" {
+				authCard.WriteString(m.Styles.Success.Render(m.ClipboardMsg))
+			} else {
+				authCard.WriteString(m.Styles.Help.Render("Tip: Press Ctrl+Y to copy URL to clipboard"))
+			}
+			authCard.WriteString("\n\n")
+
+			if m.CodeSubmitted {
+				authCard.WriteString(m.Styles.Success.Render("✓ Verification code submitted. Exchanging token..."))
+			} else {
+				authCard.WriteString(m.Styles.Label.Render("Verification Code:"))
+				authCard.WriteString("\n")
+				authCard.WriteString("  " + m.CodeInput.View())
+			}
+			authCard.WriteString("\n")
 		} else {
-			authCard.WriteString(m.Styles.Help.Render("Tip: Press Ctrl+Y to copy URL to clipboard"))
-		}
-		authCard.WriteString("\n\n")
+			authCard.WriteString(m.Styles.Info.Render("Opening Google Cloud authentication in your default browser..."))
+			authCard.WriteString("\n")
+			authCard.WriteString(
+				m.Styles.Help.Render("If your browser did not open automatically, copy and open the link below:"),
+			)
+			authCard.WriteString("\n\n")
 
-		authCard.WriteString(m.Styles.Help.Render("Waiting for authentication in browser..."))
-		authCard.WriteString("\n")
+			authBoxWidth := max(innerWidth-6, 40)
+			urlContent := m.Styles.URLBox.Width(authBoxWidth).Render(m.AuthURL)
+			authCard.WriteString(urlContent)
+			authCard.WriteString("\n\n")
+
+			if m.ClipboardMsg != "" {
+				authCard.WriteString(m.Styles.Success.Render(m.ClipboardMsg))
+			} else {
+				authCard.WriteString(m.Styles.Help.Render("Tip: Press Ctrl+Y to copy URL to clipboard"))
+			}
+			authCard.WriteString("\n\n")
+
+			authCard.WriteString(m.Styles.Help.Render("Waiting for authentication in browser..."))
+			authCard.WriteString("\n")
+		}
 
 		cardRendered := m.Styles.Card.Width(innerWidth).Render(authCard.String())
 		b.WriteString(cardRendered)
@@ -294,7 +371,11 @@ func (m *Model) View() tea.View {
 		start := 0
 		reservedHeight := max(10, 7+len(m.Headers)) + 8
 		if m.AuthURL != "" {
-			reservedHeight += 11
+			if m.isNoLaunchBrowser() {
+				reservedHeight += 13
+			} else {
+				reservedHeight += 11
+			}
 		}
 		if m.Err != nil {
 			reservedHeight += 2
@@ -328,6 +409,12 @@ func (m *Model) View() tea.View {
 
 	var help string
 	switch {
+	case m.AuthURL != "" && m.isNoLaunchBrowser() && !m.CodeSubmitted:
+		help = m.Styles.RenderHelpBar(
+			[2]string{"Enter", "submit code"},
+			[2]string{"Ctrl+Y", "copy URL"},
+			[2]string{"Ctrl+C", "quit"},
+		)
 	case m.AuthURL != "":
 		help = m.Styles.RenderHelpBar(
 			[2]string{"Ctrl+Y", "copy URL"},

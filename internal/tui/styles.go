@@ -19,25 +19,27 @@ var (
 )
 
 type Styles struct {
-	Border     lipgloss.Style
-	Title      lipgloss.Style
-	Subtitle   lipgloss.Style
-	Badge      lipgloss.Style
-	Help       lipgloss.Style
-	HelpKey    lipgloss.Style
-	HelpDesc   lipgloss.Style
-	Err        lipgloss.Style
-	ErrText    lipgloss.Style
-	Info       lipgloss.Style
-	Success    lipgloss.Style
-	Logo       lipgloss.Style
-	Card       lipgloss.Style
-	URLBox     lipgloss.Style
-	Label      lipgloss.Style
-	Value      lipgloss.Style
-	Divider    lipgloss.Style
-	LogLine    lipgloss.Style
-	StatusPill lipgloss.Style
+	Border         lipgloss.Style
+	Title          lipgloss.Style
+	Subtitle       lipgloss.Style
+	Badge          lipgloss.Style
+	Help           lipgloss.Style
+	HelpKey        lipgloss.Style
+	HelpDesc       lipgloss.Style
+	Err            lipgloss.Style
+	ErrText        lipgloss.Style
+	Info           lipgloss.Style
+	Success        lipgloss.Style
+	Logo           lipgloss.Style
+	Card           lipgloss.Style
+	URLBox         lipgloss.Style
+	Label          lipgloss.Style
+	Value          lipgloss.Style
+	Divider        lipgloss.Style
+	LogLine        lipgloss.Style
+	StatusPill     lipgloss.Style
+	InputFocused   lipgloss.Style
+	InputUnfocused lipgloss.Style
 }
 
 func DefaultStyles() *Styles {
@@ -99,6 +101,10 @@ func DefaultStyles() *Styles {
 		Foreground(White).
 		Background(Green).
 		Padding(0, 1)
+	s.InputFocused = lipgloss.NewStyle().
+		Foreground(HotPink)
+	s.InputUnfocused = lipgloss.NewStyle().
+		Foreground(LightGray)
 	return s
 }
 

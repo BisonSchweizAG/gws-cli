@@ -109,3 +109,71 @@ func TestTUI_ClipboardCopy(t *testing.T) {
 		t.Fatal("expected non-nil tea.Cmd for SetClipboard")
 	}
 }
+
+func TestTUIView_NoLaunchBrowser(t *testing.T) {
+	cfg := &types.Config{
+		FilePath:           "/path/to/config.yaml",
+		CurrentContextName: "default",
+		NoLaunchBrowser:    true,
+	}
+	cfg.InitAuthChannels()
+
+	m := tui.NewModel(context.Background(), cfg, ">_ GWS Login", func(context.Context) error {
+		return nil
+	})
+	m.Width = 100
+	m.Height = 40
+	m.AuthURL = "https://accounts.google.com/o/oauth2/auth?client_id=123"
+
+	view := m.View()
+	if !strings.Contains(view.Content, "Browserless authentication mode") {
+		t.Error("View missing Browserless authentication mode notice")
+	}
+	if !strings.Contains(view.Content, "Verification Code:") {
+		t.Error("View missing Verification Code label")
+	}
+	if !strings.Contains(view.Content, "Enter") || !strings.Contains(view.Content, "submit code") {
+		t.Error("View missing Enter submit code in help bar")
+	}
+
+	// Type characters into code input
+	for _, ch := range "4/0Atestcode123" {
+		newModel, _ := m.Update(tea.KeyPressMsg{Code: ch, Text: string(ch)})
+		var ok bool
+		m, ok = newModel.(*tui.Model)
+		if !ok {
+			t.Fatalf("expected newModel to be *tui.Model, got %T", newModel)
+		}
+	}
+
+	if m.CodeInput.Value() != "4/0Atestcode123" {
+		t.Errorf("expected CodeInput value 4/0Atestcode123, got %s", m.CodeInput.Value())
+	}
+
+	// Press Enter to submit
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	var ok bool
+	m, ok = newModel.(*tui.Model)
+	if !ok {
+		t.Fatalf("expected newModel to be *tui.Model, got %T", newModel)
+	}
+
+	if !m.CodeSubmitted {
+		t.Error("expected CodeSubmitted to be true")
+	}
+
+	select {
+	case code := <-cfg.AuthCodeChan:
+		if code != "4/0Atestcode123" {
+			t.Errorf("expected code 4/0Atestcode123 on AuthCodeChan, got %s", code)
+		}
+	default:
+		t.Error("expected code to be sent to AuthCodeChan")
+	}
+
+	// View after submission
+	viewAfter := m.View()
+	if !strings.Contains(viewAfter.Content, "Verification code submitted") {
+		t.Error("View missing submission confirmation notice")
+	}
+}

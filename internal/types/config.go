@@ -38,7 +38,8 @@ type Config struct {
 	ChromeBrowser    *ChromeBrowserConfig `yaml:"chromeBrowser,omitempty"`
 	JetbrainsGateway *GatewayConfig       `yaml:"jetbrainsGateway,omitempty"`
 
-	AuthURLChan chan string `yaml:"-"`
+	AuthURLChan  chan string `yaml:"-"`
+	AuthCodeChan chan string `yaml:"-"`
 }
 
 type ChromeBrowserConfig struct {
@@ -285,6 +286,9 @@ func (c *Config) InitAuthChannels() {
 	if c.AuthURLChan == nil {
 		c.AuthURLChan = make(chan string, 1)
 	}
+	if c.AuthCodeChan == nil {
+		c.AuthCodeChan = make(chan string, 1)
+	}
 }
 
 // SendAuthURL dispatches an authorization URL to the waiting TUI if configured.
@@ -292,6 +296,16 @@ func (c *Config) SendAuthURL(url string) {
 	if c != nil && c.AuthURLChan != nil {
 		select {
 		case c.AuthURLChan <- url:
+		default:
+		}
+	}
+}
+
+// SendAuthCode dispatches an authorization code from the TUI to the waiting login operation.
+func (c *Config) SendAuthCode(code string) {
+	if c != nil && c.AuthCodeChan != nil {
+		select {
+		case c.AuthCodeChan <- code:
 		default:
 		}
 	}

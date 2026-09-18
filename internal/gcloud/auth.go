@@ -153,10 +153,22 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 		log.Log(authURL)
 		log.Log("\nEnter verification code: ")
 
-		code, err := promptVerificationCode(ctx, stdinReader)
-		if err != nil {
-			return nil, err
+		var code string
+		var err error
+		if cfg != nil && cfg.AuthCodeChan != nil {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case code = <-cfg.AuthCodeChan:
+			}
+		} else {
+			code, err = promptVerificationCode(ctx, stdinReader)
+			if err != nil {
+				return nil, err
+			}
 		}
+
+		code = extractAuthCode(code)
 		if code == "" {
 			return nil, errors.New("verification code cannot be empty")
 		}
@@ -388,6 +400,18 @@ func (ts *TokenSourceWithRefreshCheck) Stop() {
 	}
 }
 
+func extractAuthCode(val string) string {
+	val = strings.TrimSpace(val)
+	if strings.Contains(val, "code=") {
+		if u, err := url.Parse(val); err == nil {
+			if qCode := u.Query().Get("code"); qCode != "" {
+				return qCode
+			}
+		}
+	}
+	return val
+}
+
 func promptVerificationCode(ctx context.Context, r io.Reader) (string, error) {
 	type result struct {
 		code string
@@ -397,14 +421,7 @@ func promptVerificationCode(ctx context.Context, r io.Reader) (string, error) {
 	go func() {
 		scanner := bufio.NewScanner(r)
 		if scanner.Scan() {
-			val := strings.TrimSpace(scanner.Text())
-			if strings.Contains(val, "code=") {
-				if u, err := url.Parse(val); err == nil {
-					if qCode := u.Query().Get("code"); qCode != "" {
-						val = qCode
-					}
-				}
-			}
+			val := extractAuthCode(scanner.Text())
 			ch <- result{code: val, err: nil}
 			return
 		}

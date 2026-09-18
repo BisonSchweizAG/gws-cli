@@ -276,3 +276,58 @@ func TestLogin_NoLaunchBrowser_Success(t *testing.T) {
 		t.Error("expected token to be saved in cfg")
 	}
 }
+
+func TestLogin_NoLaunchBrowser_AuthCodeChan(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			_ = r.ParseForm()
+			if r.Form.Get("code") != "chan-code-456" {
+				http.Error(w, "invalid code", http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"access_token": "mock-chan-access-token",
+				"token_type": "Bearer",
+				"expires_in": 3600
+			}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	origEndpoint := oauthConfig.Endpoint
+	defer func() {
+		oauthConfig.Endpoint = origEndpoint
+	}()
+
+	oauthConfig.Endpoint = oauth2.Endpoint{
+		AuthURL:  ts.URL + "/auth",
+		TokenURL: ts.URL + "/token",
+	}
+
+	cfg := &types.Config{
+		NoLaunchBrowser: true,
+	}
+	cfg.InitAuthChannels()
+
+	go func() {
+		// Simulate TUI sending code through channel after URL is received
+		<-cfg.AuthURLChan
+		cfg.SendAuthCode("https://bisonschweizag.github.io/gws-cli/callback/callback.html?code=chan-code-456&state=xyz")
+	}()
+
+	tokenSource, err := Login(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	tok, err := tokenSource.Token()
+	if err != nil {
+		t.Fatalf("failed to get token: %v", err)
+	}
+	if tok.AccessToken != "mock-chan-access-token" {
+		t.Errorf("got access token %q, want %q", tok.AccessToken, "mock-chan-access-token")
+	}
+}

@@ -196,6 +196,9 @@ func TestConfig_AuthChannels(t *testing.T) {
 	if cfg.AuthURLChan == nil {
 		t.Fatal("expected AuthURLChan to be initialized")
 	}
+	if cfg.AuthCodeChan == nil {
+		t.Fatal("expected AuthCodeChan to be initialized")
+	}
 
 	testURL := "https://accounts.google.com/o/oauth2/auth?client_id=test"
 	cfg.SendAuthURL(testURL)
@@ -207,5 +210,17 @@ func TestConfig_AuthChannels(t *testing.T) {
 		}
 	default:
 		t.Error("expected url to be delivered")
+	}
+
+	testCode := "4/0Axxxxxxxxxxxx"
+	cfg.SendAuthCode(testCode)
+
+	select {
+	case code := <-cfg.AuthCodeChan:
+		if code != testCode {
+			t.Errorf("expected code %s, got %s", testCode, code)
+		}
+	default:
+		t.Error("expected code to be delivered")
 	}
 }
