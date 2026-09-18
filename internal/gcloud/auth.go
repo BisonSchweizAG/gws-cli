@@ -1,15 +1,20 @@
 package gcloud
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/phayes/freeport"
@@ -24,7 +29,8 @@ import (
 )
 
 const (
-	userAgent = "google-cloud-sdk"
+	userAgent         = "google-cloud-sdk"
+	RemoteCallbackURL = "https://bisonschweizag.github.io/gws-cli/callback/callback.html"
 )
 
 var (
@@ -45,6 +51,10 @@ var (
 		Scopes:       CloudScopes,
 		Endpoint:     google.Endpoint,
 	}
+
+	NoLaunchBrowser     bool
+	FlagNoLaunchBrowser bool
+	stdinReader         io.Reader = os.Stdin
 )
 
 // Generate PKCE Code Verifier and SHA-256 Code Challenge.
@@ -121,14 +131,6 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 	localOAuth.ClientSecret = ClientSecret
 	localOAuth.Scopes = CloudScopes
 
-	port, err := freeport.GetFreePort()
-	if err != nil {
-		return nil, err
-	}
-
-	//nolint:revive // http is ok for a local callback
-	localOAuth.RedirectURL = fmt.Sprintf("http://%s/", net.JoinHostPort("localhost", strconv.Itoa(port)))
-
 	options := []oauth2.AuthCodeOption{
 		oauth2.AccessTypeOffline,
 		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
@@ -139,6 +141,58 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 	} else {
 		options = append(options, oauth2.SetAuthURLParam("prompt", "select_account"))
 	}
+
+	noLaunchBrowser := NoLaunchBrowser || FlagNoLaunchBrowser || (cfg != nil && cfg.NoLaunchBrowser)
+	if noLaunchBrowser {
+		localOAuth.RedirectURL = RemoteCallbackURL
+
+		authURL := localOAuth.AuthCodeURL(state, options...)
+		cfg.SendAuthURL(authURL)
+
+		log.Log("Go to the following link in your browser:\n")
+		log.Log(authURL)
+		log.Log("\nEnter verification code: ")
+
+		code, err := promptVerificationCode(ctx, stdinReader)
+		if err != nil {
+			return nil, err
+		}
+		if code == "" {
+			return nil, errors.New("verification code cannot be empty")
+		}
+
+		token, err := localOAuth.Exchange(ctx, code,
+			oauth2.SetAuthURLParam("code_verifier", codeVerifier),
+			oauth2.SetAuthURLParam("client_secret", localOAuth.ClientSecret),
+		)
+		if err != nil {
+			log.Logf("🚨 OAuth exchange error: %v", err)
+			return nil, err
+		}
+
+		// Save token (may not contain a refresh token if consent not granted)
+		if err := cfg.SetToken(*token); err != nil {
+			// log save error but continue - we still return the token for in-memory usage
+			log.Logf("Failed to persist token: %v", err)
+		}
+
+		log.Log("Authenticated...")
+
+		// Warn if the refresh token was not provided.
+		if token.RefreshToken == "" {
+			log.Log("Warning: no refresh token returned. You may need to re-auth with prompt=consent to get a refresh token.")
+		}
+
+		return newTokenSourceWithRefreshCheck(ctx, token, cfg, &localOAuth), nil
+	}
+
+	port, err := freeport.GetFreePort()
+	if err != nil {
+		return nil, err
+	}
+
+	//nolint:revive // http is ok for a local callback
+	localOAuth.RedirectURL = fmt.Sprintf("http://%s/", net.JoinHostPort("localhost", strconv.Itoa(port)))
 
 	authURL := localOAuth.AuthCodeURL(state, options...)
 
@@ -331,5 +385,40 @@ func (ts *TokenSourceWithRefreshCheck) Stop() {
 		// already closed / drained
 	default:
 		close(ts.done)
+	}
+}
+
+func promptVerificationCode(ctx context.Context, r io.Reader) (string, error) {
+	type result struct {
+		code string
+		err  error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		scanner := bufio.NewScanner(r)
+		if scanner.Scan() {
+			val := strings.TrimSpace(scanner.Text())
+			if strings.Contains(val, "code=") {
+				if u, err := url.Parse(val); err == nil {
+					if qCode := u.Query().Get("code"); qCode != "" {
+						val = qCode
+					}
+				}
+			}
+			ch <- result{code: val, err: nil}
+			return
+		}
+		if err := scanner.Err(); err != nil {
+			ch <- result{err: err}
+			return
+		}
+		ch <- result{err: errors.New("no verification code provided")}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case res := <-ch:
+		return res.code, res.err
 	}
 }

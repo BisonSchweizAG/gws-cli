@@ -19,8 +19,9 @@ var (
 		Short:   "Google Cloud Workstation Utils",
 		Version: version.Version,
 	}
-	flagConfig  string
-	flagContext string
+	flagConfig          string
+	flagContext         string
+	flagNoLaunchBrowser bool
 )
 
 func Execute() {
@@ -39,6 +40,8 @@ func run() error {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&flagContext, "ctx", "", "The context to be used")
 	rootCmd.PersistentFlags().StringVar(&flagConfig, "config", types.ConfigFileName, "The config file to be used")
+	rootCmd.PersistentFlags().
+		BoolVar(&flagNoLaunchBrowser, "no-launch-browser", false, "Do not launch a browser for authentication")
 }
 
 func readConfig(args ...string) (*types.Config, error) {
@@ -49,6 +52,8 @@ func readConfig(args ...string) (*types.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	config.NoLaunchBrowser = flagNoLaunchBrowser
 
 	if flagContext != "" {
 		err = config.SwitchContext(flagContext, false)

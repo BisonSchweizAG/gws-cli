@@ -26,5 +26,6 @@ func runSetup(_ *cobra.Command, _ []string) error {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	cfg.NoLaunchBrowser = flagNoLaunchBrowser
 	return setup.Run(cfg, flagContext)
 }
