@@ -38,6 +38,7 @@ type Styles struct {
 	Divider    lipgloss.Style
 	LogLine    lipgloss.Style
 	StatusPill lipgloss.Style
+	SSH        lipgloss.Style
 }
 
 func DefaultStyles() *Styles {
@@ -99,6 +100,8 @@ func DefaultStyles() *Styles {
 		Foreground(White).
 		Background(Green).
 		Padding(0, 1)
+	s.SSH = lipgloss.NewStyle().
+		Foreground(Amber)
 	return s
 }
 

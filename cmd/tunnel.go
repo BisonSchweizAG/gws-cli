@@ -51,11 +51,13 @@ var tunnelCmd = &cobra.Command{
 			return gcloud.TCPTunnelWithPassphrase(ctx, cfg, flagLocalPort)
 		})
 
+		m.AddHeader("SSH User", m.Styles.SSH.Render(cfg.CurrentContext().User))
+		m.AddHeader("SSH Host", m.Styles.SSH.Render(cfg.CurrentContext().Host))
 		port := flagLocalPort
 		if port == 0 {
 			port = cfg.CurrentContext().Port
 		}
-		m.AddHeader("Local Port", strconv.Itoa(port))
+		m.AddHeader("SSH Port", m.Styles.SSH.Render(strconv.Itoa(port)))
 
 		p := tea.NewProgram(m)
 		_, err = p.Run()
