@@ -19,8 +19,9 @@ import (
 
 // statusCmd represents the status command.
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "List all configured workstations with their state",
+	Use:     "status",
+	Short:   "List all configured workstations with their state",
+	Aliases: []string{"st"},
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		cfg, err := readConfig()
 		if err != nil {
