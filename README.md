@@ -191,3 +191,10 @@ If this is the case, right-click on the gws.exe file and select `Properties` / `
 In the `Properties` / `Eigenschaften` dialog, click on the `Unblock` / `Zulassen` button.
 
 ![Unblock](docs/windows-properties.png "Unblock")
+
+## MacOS Binary Unlock
+
+On some systems, MacOS may block the execution of the gws binary. To allow the gws to run, verify you have
+downloaded it from this repository. Then you open a terminal and execute the following command, where ```gws``` is the full path to gws binary :
+
+```sudo xattr -d com.apple.quarantine gws```
