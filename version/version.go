@@ -1,8 +1,10 @@
 package version
 
 var (
+	// DevelVersion the module version.
+	DevelVersion = "devel"
 	// Version the module version.
-	Version = "devel"
+	Version = DevelVersion
 
 	// Name the name of this tool.
 	Name = "bakito/gws"
