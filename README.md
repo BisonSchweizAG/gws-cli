@@ -14,7 +14,7 @@ connect to your workstation, as well as manage your configuration.
 ## Installation
 
 You can install `gws` by downloading a binary from
-the [latest release]( https://github.com/bisonschweizag/gws-cli/releases/tag/v0.2.0) or via go by using `go install`:
+the [latest release]( https://github.com/BisonSchweizAG/gws-cli/releases/latest) or via go by using `go install`:
 
 A command-line tool to manage Google Cloud Workstations.
 
@@ -26,7 +26,7 @@ connect to your workstation, as well as manage your configuration.
 ## Installation
 
 You can install `gws` by downloading a binary from
-the [latest release]( https://github.com/bisonschweizag/gws-cli/releases/tag/v0.2.0) or via go by using `go install`:
+the [latest release]( https://github.com/BisonSchweizAG/gws-cli/releases/latest) or via go by using `go install`:
 
 ```bash
 go install github.com/bisonschweizag/gws-cli@latest
