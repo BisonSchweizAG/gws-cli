@@ -209,11 +209,23 @@ func (u *Updater) Apply(ctx context.Context, rel *Release) error {
 	newPath := filepath.Join(dir, "."+base+".new")
 	oldPath := filepath.Join(dir, "."+base+".old")
 
-	defer removeQuietly(newPath) // no-op after a successful swap
+	// newPath only needs cleaning up if we did not manage to install it: after
+	// a successful swap it has been renamed to exe and no longer exists.
+	installed := false
+	defer func() {
+		if !installed {
+			_ = os.Remove(newPath)
+		}
+	}()
+
 	if err := extractBinary(archivePath, rel.Archive, binName, newPath, info.Mode().Perm()); err != nil {
 		return fmt.Errorf("extract %s: %w", rel.Archive, err)
 	}
-	return replaceExecutable(exe, newPath, oldPath)
+	if err := replaceExecutable(exe, newPath, oldPath); err != nil {
+		return err
+	}
+	installed = true
+	return nil
 }
 
 func (u *Updater) executable() (string, error) {
@@ -284,7 +296,7 @@ func (u *Updater) getJSON(ctx context.Context, url string, v any) error {
 }
 
 func (u *Updater) get(ctx context.Context, url, accept string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +305,7 @@ func (u *Updater) get(ctx context.Context, url, accept string) (*http.Response, 
 		req.Header.Set("Accept", accept)
 	}
 	if strings.HasPrefix(url, u.APIBase) {
-		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+		req.Header.Set("X-Github-Api-Version", "2022-11-28")
 	}
 	resp, err := u.Client.Do(req)
 	if err != nil {
@@ -396,7 +408,8 @@ func writeFile(dst string, src io.Reader, mode os.FileMode) error {
 // replaceExecutable swaps newPath in for exe. Renaming a running executable is
 // allowed on Linux/macOS and on Windows (deleting it is not), so the old binary
 // is moved aside first and removed afterwards; on Windows that removal fails
-// while we are still running, and the leftover is deleted by the next update.
+// while we are still running, so the leftover is hidden and deleted by the next
+// update.
 func replaceExecutable(exe, newPath, oldPath string) error {
 	_ = os.Remove(oldPath) // leftover from a previous update
 
@@ -405,11 +418,13 @@ func replaceExecutable(exe, newPath, oldPath string) error {
 	}
 	if err := os.Rename(newPath, exe); err != nil {
 		if rerr := os.Rename(oldPath, exe); rerr != nil {
-			return fmt.Errorf("install new binary: %v; rollback failed, previous binary is at %s: %w", err, oldPath, rerr)
+			return fmt.Errorf("install new binary: %w; rollback failed, previous binary is at %s: %w", err, oldPath, rerr)
 		}
 		return fmt.Errorf("install new binary (rolled back): %w", err)
 	}
-	_ = os.Remove(oldPath)
+	if err := os.Remove(oldPath); err != nil {
+		_ = hideFile(oldPath) // Windows: cannot delete the image of a running process
+	}
 	return nil
 }
 

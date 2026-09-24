@@ -55,6 +55,7 @@ func TestFindChecksum(t *testing.T) {
 	}
 }
 
+//nolint:unparam
 func makeTarGz(t *testing.T, name, content string) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -132,6 +133,7 @@ func newServer(t *testing.T, archiveName string, archive []byte, checksum string
 
 func sum(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
 
+//nolint:unparam
 func writeExe(t *testing.T, name, content string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), name)
@@ -216,5 +218,27 @@ func TestUnsupportedPlatform(t *testing.T) {
 	u.GOOS, u.GOARCH = "linux", "arm64" // not built by .goreleaser.yml
 	if _, err := u.Latest(context.Background()); !errors.Is(err, ErrNoAsset) {
 		t.Fatalf("err = %v, want ErrNoAsset", err)
+	}
+}
+
+func TestMissingBinaryInArchiveLeavesNoFiles(t *testing.T) {
+	archive := makeTarGz(t, "not-gws", "NEW")
+	u := newServer(t, "gws_1.10.0_linux_amd64.tar.gz", archive, sum(archive))
+	u.GOOS, u.GOARCH = "linux", "amd64"
+	u.ExePath = writeExe(t, "gws", "OLD")
+
+	rel, err := u.Latest(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Apply(context.Background(), rel); err == nil {
+		t.Fatal("expected error for archive without gws binary")
+	}
+	if got, _ := os.ReadFile(u.ExePath); string(got) != "OLD" {
+		t.Fatalf("exe was modified: %q", got)
+	}
+	entries, _ := os.ReadDir(filepath.Dir(u.ExePath))
+	if len(entries) != 1 {
+		t.Errorf("leftover files: %v", entries)
 	}
 }
