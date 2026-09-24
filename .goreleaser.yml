@@ -33,6 +33,7 @@ builds:
       - linux
       - windows
       - darwin
+      - android
     goarch:
       - amd64
       - arm64
@@ -41,6 +42,8 @@ builds:
         goarch: arm64
       - goos: windows
         goarch: arm64
+      - goos: android
+        goarch: amd64
 checksum:
   name_template: 'checksums.txt'
 signs:

@@ -2,7 +2,7 @@ package version
 
 var (
 	// DevelVersion the module version.
-	DevelVersion = "devel"
+	DevelVersion = "v0.0.0-devel"
 	// Version the module version.
 	Version = DevelVersion
 
