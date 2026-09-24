@@ -9,6 +9,9 @@ lint: tb.golangci-lint
 tidy:
 	go mod tidy
 
+gofix:
+	go fix ./...
+
 # Run tests
 test:
 	go test ./... -v -coverprofile=coverage.out
