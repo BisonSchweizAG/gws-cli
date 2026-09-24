@@ -25,6 +25,7 @@ func TestIsNewer(t *testing.T) {
 		want      bool
 		wantErr   error
 	}{
+		{"v0.0.0", "v1.2.4", true, nil},
 		{"v1.2.3", "v1.2.4", true, nil},
 		{"v1.2.3", "v1.10.0", true, nil}, // numeric, not lexical
 		{"v1.2.3", "v1.2.3", false, nil},
@@ -34,7 +35,7 @@ func TestIsNewer(t *testing.T) {
 		{"v1.2.3-next", "v1.2.4", false, ErrUnknownVersion},
 		{"v1.2.3-rc.1", "v1.2.3", false, ErrUnknownVersion},
 		{"", "v1.0.0", false, ErrUnknownVersion},
-		{version.DevelVersion, "v1.2.4", true, nil},
+		{version.Version, "v1.2.4", true, nil},
 	}
 	for _, tt := range tests {
 		got, err := IsNewer(tt.cur, tt.cand)
