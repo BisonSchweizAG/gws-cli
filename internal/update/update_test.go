@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/bisonschweizag/gws-cli/version"
 )
 
 func TestIsNewer(t *testing.T) {
@@ -30,7 +32,9 @@ func TestIsNewer(t *testing.T) {
 		{"1.2.3", "v1.2.4", true, nil},
 		{"dev", "v1.0.0", false, ErrUnknownVersion},
 		{"v1.2.3-next", "v1.2.4", false, ErrUnknownVersion},
+		{"v1.2.3-rc.1", "v1.2.3", false, ErrUnknownVersion},
 		{"", "v1.0.0", false, ErrUnknownVersion},
+		{version.DevelVersion, "v1.2.4", true, nil},
 	}
 	for _, tt := range tests {
 		got, err := IsNewer(tt.cur, tt.cand)
@@ -107,6 +111,9 @@ func newServer(t *testing.T, archiveName string, archive []byte, checksum string
 		 {"tag_name":"v9.0.0","prerelease":true,"assets":[]},
 		 {"tag_name":"v8.0.0","draft":true,"assets":[]},
 		 {"tag_name":"nightly","assets":[]},
+		 {"tag_name":"v99","assets":[]},
+		 {"tag_name":"v50.0.0-rc.1","assets":[]},
+		 {"tag_name":"v60.0.0+build","assets":[]},
 		 {"tag_name":"v1.2.0","assets":[]},
 		 {"tag_name":"v1.10.0","assets":[%s,%s]}
 		]`, asset(archiveName), asset("checksums.txt"))

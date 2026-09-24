@@ -87,10 +87,3 @@ jobs:
           name: gws.exe
           path: dist/gws_windows_amd64_v1/gws.exe
           retention-days: 1
-
-      - name: Upload Android build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: gws.exe
-          path: dist/gws_android_arm64_v8.0/gws
-          retention-days: 1

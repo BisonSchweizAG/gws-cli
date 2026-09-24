@@ -23,11 +23,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -102,21 +102,14 @@ func (u *Updater) Latest(ctx context.Context) (*Release, error) {
 		return nil, err
 	}
 
-	var (
-		best    *ghRelease
-		bestVer [3]int
-	)
+	var best *ghRelease
 	for i := range releases {
 		r := &releases[i]
-		if r.Draft || r.Prerelease {
+		if r.Draft || r.Prerelease || !isReleaseTag(r.TagName) {
 			continue
 		}
-		v, ok := parseSemver(r.TagName)
-		if !ok {
-			continue
-		}
-		if best == nil || compare(v, bestVer) > 0 {
-			best, bestVer = r, v
+		if best == nil || semver.Compare(r.TagName, best.TagName) > 0 {
+			best = r
 		}
 	}
 	if best == nil {
@@ -128,8 +121,8 @@ func (u *Updater) Latest(ctx context.Context) (*Release, error) {
 		ext = "zip"
 	}
 	// goreleaser's {{ .Version }} is the tag without the leading "v".
-	archive := fmt.Sprintf("%s_%d.%d.%d_%s_%s.%s",
-		binaryName, bestVer[0], bestVer[1], bestVer[2], u.GOOS, u.GOARCH, ext)
+	archive := fmt.Sprintf("%s_%s_%s_%s.%s",
+		binaryName, strings.TrimPrefix(best.TagName, "v"), u.GOOS, u.GOARCH, ext)
 
 	rel := &Release{Tag: best.TagName, Archive: archive}
 	for _, a := range best.Assets {
@@ -150,17 +143,34 @@ func (u *Updater) Latest(ctx context.Context) (*Release, error) {
 }
 
 // IsNewer reports whether candidate is a higher version than current.
-// It returns ErrUnknownVersion if current is not a plain vMAJOR.MINOR.PATCH.
+// It returns ErrUnknownVersion if current is not a plain release version
+// (dev builds, or goreleaser snapshots such as "v1.2.3-next").
 func IsNewer(current, candidate string) (bool, error) {
-	c, ok := parseSemver(current)
-	if !ok {
+	cur := withV(current)
+	if !semver.IsValid(cur) || semver.Prerelease(cur) != "" {
 		return false, fmt.Errorf("%w: %q", ErrUnknownVersion, current)
 	}
-	n, ok := parseSemver(candidate)
-	if !ok {
+	cand := withV(candidate)
+	if !semver.IsValid(cand) {
 		return false, fmt.Errorf("invalid version %q", candidate)
 	}
-	return compare(n, c) > 0, nil
+	return semver.Compare(cand, cur) > 0, nil
+}
+
+// isReleaseTag reports whether tag looks like a tag created by a release:
+// exactly vMAJOR.MINOR.PATCH. This rejects prereleases, build metadata and
+// the shorthands ("v1", "v1.2") that x/mod/semver otherwise accepts, e.g.
+// floating major tags.
+func isReleaseTag(tag string) bool {
+	return semver.IsValid(tag) && semver.Canonical(tag) == tag && semver.Prerelease(tag) == ""
+}
+
+// withV adds the "v" prefix that x/mod/semver requires.
+func withV(v string) string {
+	if strings.HasPrefix(v, "v") {
+		return v
+	}
+	return "v" + v
 }
 
 // Apply downloads the release archive, verifies its SHA-256 against
@@ -274,7 +284,7 @@ func (u *Updater) getJSON(ctx context.Context, url string, v any) error {
 }
 
 func (u *Updater) get(ctx context.Context, url, accept string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +293,7 @@ func (u *Updater) get(ctx context.Context, url, accept string) (*http.Response, 
 		req.Header.Set("Accept", accept)
 	}
 	if strings.HasPrefix(url, u.APIBase) {
-		req.Header.Set("X-Github-Api-Version", "2022-11-28")
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	}
 	resp, err := u.Client.Do(req)
 	if err != nil {
@@ -395,44 +405,12 @@ func replaceExecutable(exe, newPath, oldPath string) error {
 	}
 	if err := os.Rename(newPath, exe); err != nil {
 		if rerr := os.Rename(oldPath, exe); rerr != nil {
-			return fmt.Errorf("install new binary: %w; rollback failed, previous binary is at %s: %w", err, oldPath, rerr)
+			return fmt.Errorf("install new binary: %v; rollback failed, previous binary is at %s: %w", err, oldPath, rerr)
 		}
 		return fmt.Errorf("install new binary (rolled back): %w", err)
 	}
 	_ = os.Remove(oldPath)
 	return nil
-}
-
-var semverRe = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)$`)
-
-// parseSemver accepts plain vMAJOR.MINOR.PATCH only; suffixes such as
-// "-next" (goreleaser snapshots) or "-rc1" are rejected on purpose.
-func parseSemver(s string) ([3]int, bool) {
-	m := semverRe.FindStringSubmatch(s)
-	if m == nil {
-		return [3]int{}, false
-	}
-	var v [3]int
-	for i := range v {
-		n, err := strconv.Atoi(m[i+1])
-		if err != nil {
-			return [3]int{}, false
-		}
-		v[i] = n
-	}
-	return v, true
-}
-
-func compare(a, b [3]int) int {
-	for i := range a {
-		switch {
-		case a[i] > b[i]:
-			return 1
-		case a[i] < b[i]:
-			return -1
-		}
-	}
-	return 0
 }
 
 func closeQuietly(w io.Closer) {
