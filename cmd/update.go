@@ -4,49 +4,68 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"runtime"
+	"os"
+	"os/signal"
 
-	"github.com/creativeprojects/go-selfupdate"
 	"github.com/spf13/cobra"
 
+	"github.com/bisonschweizag/gws-cli/internal/update"
 	"github.com/bisonschweizag/gws-cli/version"
 )
 
-// updateCmd represents the update command.
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update gws",
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		return update(cmd.Context(), version.Version)
-	},
+	Short: "Update gws to the latest release from GitHub",
+	Long: `Download the latest gws release from GitHub, verify its SHA-256 checksum
+and replace the running binary. Use --check to only look for a newer version.`,
+	Args: cobra.NoArgs,
+	RunE: runUpdate,
 }
 
 func init() {
-	rootCmd.AddCommand(updateCmd)
+	updateCmd.Flags().Bool("check", false, "only check whether a newer version is available")
+	updateCmd.Flags().Bool("force", false, "install the latest release even if it is not newer (or this is a dev build)")
+	rootCmd.AddCommand(updateCmd) // adjust if your root command variable is named differently
 }
 
-func update(ctx context.Context, v string) error {
-	latest, found, err := selfupdate.DetectLatest(ctx, selfupdate.ParseSlug("BisonSchweizAG/gws-cli"))
+func runUpdate(cmd *cobra.Command, _ []string) error {
+	checkOnly, _ := cmd.Flags().GetBool("check")
+	force, _ := cmd.Flags().GetBool("force")
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	out := cmd.OutOrStdout()
+	u := update.New()
+
+	latest, err := u.Latest(ctx)
 	if err != nil {
-		return fmt.Errorf("error occurred while detecting version: %w", err)
-	}
-	if !found {
-		return fmt.Errorf("latest version for %s/%s could not be found from github repository", runtime.GOOS, runtime.GOARCH)
+		return fmt.Errorf("check for updates: %w", err)
 	}
 
-	if v != version.DevelVersion && latest.LessOrEqual(v) {
-		log.Printf("Current version (%s) is the latest", v)
+	newer, err := update.IsNewer(version.Version, latest.Tag)
+	switch {
+	case errors.Is(err, update.ErrUnknownVersion):
+		if !force {
+			return fmt.Errorf("this build (%q) is not a release version; latest is %s, use --force to install it anyway",
+				version.Version, latest.Tag)
+		}
+	case err != nil:
+		return err
+	case !newer && !force:
+		fmt.Fprintf(out, "gws %s is up to date\n", version.Version)
 		return nil
 	}
 
-	exe, err := selfupdate.ExecutablePath()
-	if err != nil {
-		return errors.New("could not locate executable path")
+	if checkOnly {
+		fmt.Fprintf(out, "Update available: %s -> %s\n", version.Version, latest.Tag)
+		return nil
 	}
-	if err := selfupdate.UpdateTo(ctx, latest.AssetURL, latest.AssetName, exe); err != nil {
-		return fmt.Errorf("error occurred while updating binary: %w", err)
+
+	fmt.Fprintf(out, "Updating %s -> %s ...\n", version.Version, latest.Tag)
+	if err := u.Apply(ctx, latest); err != nil {
+		return fmt.Errorf("update failed: %w", err)
 	}
-	log.Printf("Successfully updated to version %s", latest.Version())
+	fmt.Fprintf(out, "Updated to %s\n", latest.Tag)
 	return nil
 }
