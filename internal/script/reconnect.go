@@ -38,13 +38,8 @@ func render(script string, cfg *types.Config, fileName, fileExt string) (name st
 	name = outFileName(fileName)
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf,
-		&NamedContext{
-			Name:     cfg.CurrentContextName,
-			FileName: name,
-			Context:  *cfg.CurrentContext(),
-		},
-	); err != nil {
+	err = tmpl.Execute(&buf, &NamedContext{Name: cfg.CurrentContextName, FileName: name, Context: *cfg.CurrentContext()})
+	if err != nil {
 		return "", nil, err
 	}
 
