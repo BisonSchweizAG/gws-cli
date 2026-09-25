@@ -20,6 +20,8 @@ cloud.google.com/go/longrunning v1.2.0 h1:WjYH3YHBGCxGJP9M4dWGHBfXr/cFIjMkNgWcJj
 cloud.google.com/go/longrunning v1.2.0/go.mod h1:5KMQALFGOCtFoi2xSOA1u3H7WKlhmckgiyFw7+LGQp0=
 cloud.google.com/go/workstations v1.8.0 h1:iDnzFcw3xG+t+N9Tmws2HM68yYlAonhVG3X8JaSLM30=
 cloud.google.com/go/workstations v1.8.0/go.mod h1:5e6v3c0pdpOuA8VobFNbZQXzoGFrzTfIBMigxCe6yJ0=
+cloud.google.com/go/workstations v1.9.0 h1:+fOGx5vhNbHZtBlkoBFsnmS8qw/qxJIg7kNeYwZzcOM=
+cloud.google.com/go/workstations v1.9.0/go.mod h1:XJac6EHi6lCJDN3fVJEJVmjscyxpMo2ftcD1HUejmZI=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
 github.com/aymanbagabas/go-udiff v0.4.1 h1:OEIrQ8maEeDBXQDoGCbbTTXYJMYRCRO1fnodZ12Gv5o=
