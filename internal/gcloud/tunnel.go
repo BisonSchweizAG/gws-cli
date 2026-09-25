@@ -124,8 +124,8 @@ func postConnectCommand(ctx context.Context, sshContext *types.Context) {
 	if len(sshContext.PostConnectCommand) > 0 {
 		go func() {
 			log.Logf(">_ Starting post-connect command: %s", strings.Join(sshContext.PostConnectCommand, " "))
-			if err := exec.CommandContext(ctx, sshContext.PostConnectCommand[0], sshContext.PostConnectCommand[1:]...).
-				Start(); err != nil {
+			err := exec.CommandContext(ctx, sshContext.PostConnectCommand[0], sshContext.PostConnectCommand[1:]...).Start()
+			if err != nil {
 				log.Logf("🚨 Failed to start post-connect command: %v", err)
 			}
 		}()
