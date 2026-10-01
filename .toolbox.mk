@@ -25,7 +25,7 @@ TB_GOVERSIONINFO_VERSION ?= v1.7.0
 # renovate: packageName=github.com/bakito/semver
 TB_SEMVER_VERSION ?= v1.1.10
 # renovate: packageName=github.com/anchore/syft/cmd/syft
-TB_SYFT_VERSION ?= v1.53.0
+TB_SYFT_VERSION ?= v1.54.0
 
 ## Tool Installer
 .PHONY: tb.golangci-lint
