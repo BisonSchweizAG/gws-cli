@@ -10,6 +10,18 @@
     "enabled": true,
     "groupName": "security updates"
   },
+  "packageRules": [
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -22,6 +34,9 @@
         "# renovate: packageName=(?<packageName>.+?)\\s+.+?_VERSION \\?= (?<currentValue>.+?)\\s"
       ]
     }
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
   ],
   "dependencyDashboard": true
 }
