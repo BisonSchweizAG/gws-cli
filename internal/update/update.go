@@ -164,8 +164,8 @@ func IsNewer(current, candidate string) (bool, error) {
 // appends to snapshot builds (e.g. "v0.0.0-next" -> "v0.0.0").
 func stripSnapshot(v string) string {
 	const suffix = "-next"
-	if strings.HasSuffix(v, suffix) {
-		return strings.TrimSuffix(v, suffix)
+	if before, ok := strings.CutSuffix(v, suffix); ok {
+		return before
 	}
 	return v
 }
