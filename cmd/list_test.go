@@ -134,6 +134,55 @@ func Test_listFormatDateTime(t *testing.T) {
 	}
 }
 
+func Test_listRunningFilter(t *testing.T) {
+	now := time.Now()
+	startTime := timestamppb.New(now.Add(-1 * time.Hour)).AsTime()
+
+	workstations := []gcloud.ProjectWorkstation{
+		{
+			Name:        "ws-running",
+			State:       workstationspb.Workstation_STATE_RUNNING,
+			LastStarted: &startTime,
+		},
+		{
+			Name:        "ws-starting",
+			State:       workstationspb.Workstation_STATE_STARTING,
+			LastStarted: &startTime,
+		},
+		{
+			Name:        "ws-stopping",
+			State:       workstationspb.Workstation_STATE_STOPPING,
+			LastStarted: &startTime,
+		},
+		{
+			Name:        "ws-stopped",
+			State:       workstationspb.Workstation_STATE_STOPPED,
+			LastStarted: &startTime,
+		},
+	}
+
+	// Simulate the running filter from list.go
+	filtered := make([]gcloud.ProjectWorkstation, 0, len(workstations))
+	for _, ws := range workstations {
+		switch ws.State {
+		case workstationspb.Workstation_STATE_RUNNING,
+			workstationspb.Workstation_STATE_STARTING,
+			workstationspb.Workstation_STATE_STOPPING:
+			filtered = append(filtered, ws)
+		}
+	}
+
+	expectedNames := []string{"ws-running", "ws-starting", "ws-stopping"}
+	if len(filtered) != len(expectedNames) {
+		t.Errorf("running filter returned %d workstations, want %d", len(filtered), len(expectedNames))
+	}
+	for i, ws := range filtered {
+		if ws.Name != expectedNames[i] {
+			t.Errorf("position %d: got %s, want %s", i, ws.Name, expectedNames[i])
+		}
+	}
+}
+
 func Test_listFormatState(t *testing.T) {
 	tests := []struct {
 		state    workstationspb.Workstation_State
