@@ -252,7 +252,7 @@ func (m *Model) View() tea.View {
 		versionLine = fmt.Sprintf(
 			"%s %s",
 			versionLine,
-			m.Styles.Badge.Render(fmt.Sprintf("↗ %s available", m.NewVersionAvailable)),
+			m.Styles.Badge.Render(fmt.Sprintf("🚨 %s available", m.NewVersionAvailable)),
 		)
 	}
 	fmt.Fprintf(&left, "  Version:     %s\n", versionLine)
