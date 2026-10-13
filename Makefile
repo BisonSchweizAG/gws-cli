@@ -23,7 +23,7 @@ release: tb.goreleaser tb.semver tb.syft tb.goversioninfo
 	PATH=$(TB_LOCALBIN):$${PATH} $(TB_GORELEASER) --clean
 
 test-release: tb.goreleaser tb.syft tb.goversioninfo
-	PATH=$(TB_LOCALBIN):$${PATH} GOOGLE_OIDC_CLIENT_ID=test-client GOOGLE_OIDC_CLIENT_SECRET=test-secret \
+	PATH=$(TB_LOCALBIN):$${PATH} GOOGLE_OIDC_CLIENT_ID=test-client GOOGLE_OIDC_CLIENT_SECRET=test-secret GWS_SKIP_SIGN=true \
 	  $(TB_GORELEASER) --skip=publish --snapshot --clean
 
 test-release-ci: tb.goreleaser tb.syft tb.goversioninfo

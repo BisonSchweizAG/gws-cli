@@ -20,7 +20,7 @@ builds:
       #  - goversioninfo -platform-specific=true -icon=icon/icon.ico -skip-versioninfo=true
       post:
         - |
-          sh -c 'if [ "{{ .Os }}" = "windows" ]; then 
+          sh -c 'if [ "{{ .Os }}" = "windows" ] && [ -z "{{ .Env.GWS_SKIP_SIGN }}" ]; then
             osslsigncode sign -pkcs12 sign/cert.pfx -pass "{{ .Env.SIGNING_CERT_PASSWORD }}" -n "{{ .ProjectName }}" -i "https://github.com/BisonSchweizAG/gws-cli" -h sha256 -t "http://timestamp.digicert.com" -in "{{ .Path }}" -out "{{ .Path }}.signed"
             mv "{{ .Path }}.signed" "{{ .Path }}"
           fi'
