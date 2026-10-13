@@ -19,9 +19,10 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
-var pollInterval = 10 * time.Second
+const wsEnvUserName = "BISON_WORKSTATION_USER_NAME"
 
 var (
+	pollInterval = 10 * time.Second
 	clientMu     sync.Mutex
 	cachedClient *workstations.Client
 )
@@ -238,7 +239,7 @@ type Workstation struct {
 }
 
 // ProjectWorkstation holds the details of a workstation listed from a GCP project,
-// including its current state and last update time.
+// including its current state, last update time, and the user from the config env.
 type ProjectWorkstation struct {
 	Project     string
 	Region      string
@@ -247,7 +248,7 @@ type ProjectWorkstation struct {
 	Name        string
 	State       workstationspb.Workstation_State
 	LastStarted *time.Time
-	LastUpdated *time.Time
+	User        string
 }
 
 func ListWorkstations(ctx context.Context, cfg *types.Config, project string) ([]Workstation, error) {
@@ -396,15 +397,12 @@ func ListProjectWorkstations(
 				Config:  parsed.Config,
 				Name:    parsed.Name,
 				State:   ws.GetState(),
+				User:    getWorkstationEnvVar(ws, wsEnvUserName),
 			}
 
 			if ws.GetStartTime() != nil {
 				t := ws.GetStartTime().AsTime()
 				pw.LastStarted = &t
-			}
-			if ws.GetUpdateTime() != nil {
-				t := ws.GetUpdateTime().AsTime()
-				pw.LastUpdated = &t
 			}
 
 			results = append(results, pw)
@@ -412,6 +410,16 @@ func ListProjectWorkstations(
 	}
 
 	return results, nil
+}
+
+// getWorkstationEnvVar returns the value of the named environment variable from
+// a workstation's environment, or an empty string if not found.
+func getWorkstationEnvVar(ws *workstationspb.Workstation, name string) string {
+	env := ws.GetEnv()
+	if env == nil {
+		return ""
+	}
+	return env[name]
 }
 
 func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {

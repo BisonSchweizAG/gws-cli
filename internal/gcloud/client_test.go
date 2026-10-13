@@ -494,11 +494,13 @@ func Test_ListProjectWorkstations(t *testing.T) {
 				State:      workstationspb.Workstation_STATE_RUNNING,
 				StartTime:  startTime,
 				UpdateTime: updateTime,
+				Env:        map[string]string{wsEnvUserName: "testuser"},
 			},
 			{
 				Name:       configName + "/workstations/ws-2",
 				State:      workstationspb.Workstation_STATE_STOPPED,
 				UpdateTime: updateTime,
+				Env:        map[string]string{wsEnvUserName: "otheruser"},
 			},
 		},
 	}
@@ -556,9 +558,6 @@ func Test_ListProjectWorkstations(t *testing.T) {
 	if ws1.LastStarted == nil {
 		t.Error("ws1 LastStarted should be set")
 	}
-	if ws1.LastUpdated == nil {
-		t.Error("ws1 LastUpdated should be set")
-	}
 
 	// Check ws-2
 	ws2 := results[1]
@@ -571,8 +570,11 @@ func Test_ListProjectWorkstations(t *testing.T) {
 	if ws2.LastStarted != nil {
 		t.Error("ws2 LastStarted should be nil (no start time set)")
 	}
-	if ws2.LastUpdated == nil {
-		t.Error("ws2 LastUpdated should be set")
+	if ws1.User != "testuser" {
+		t.Errorf("ws1 User = %q, want %q", ws1.User, "testuser")
+	}
+	if ws2.User != "otheruser" {
+		t.Errorf("ws2 User = %q, want %q", ws2.User, "otheruser")
 	}
 }
 

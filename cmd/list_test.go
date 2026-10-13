@@ -65,59 +65,39 @@ func Test_listWorkstationSorting(t *testing.T) {
 	now := time.Now()
 	startTime1 := timestamppb.New(now.Add(-1 * time.Hour)).AsTime()
 	startTime2 := timestamppb.New(now.Add(-2 * time.Hour)).AsTime()
-	updateTime1 := timestamppb.New(now.Add(-30 * time.Minute)).AsTime()
-	updateTime2 := timestamppb.New(now.Add(-1 * time.Hour)).AsTime()
 
 	workstations := []gcloud.ProjectWorkstation{
 		{
-			Cluster:     "cluster-b",
 			Config:      "config-1",
 			Name:        "ws-1",
 			State:       workstationspb.Workstation_STATE_RUNNING,
 			LastStarted: &startTime1,
-			LastUpdated: &updateTime1,
 		},
 		{
-			Cluster:     "cluster-a",
 			Config:      "config-2",
 			Name:        "ws-2",
 			State:       workstationspb.Workstation_STATE_STOPPED,
 			LastStarted: &startTime2,
-			LastUpdated: &updateTime2,
 		},
 		{
-			Cluster:     "cluster-a",
 			Config:      "config-1",
 			Name:        "ws-3",
 			State:       workstationspb.Workstation_STATE_STARTING,
 			LastStarted: &startTime1,
-			LastUpdated: &updateTime1,
 		},
 	}
 
-	// Verify sorting by cluster, then config, then name
-	expectedOrder := []string{"ws-3", "ws-2", "ws-1"}
-	// ws-3: cluster-a/config-1, ws-2: cluster-a/config-2, ws-1: cluster-b/config-1
+	// Verify sorting by name (default)
+	expectedOrder := []string{"ws-1", "ws-2", "ws-3"}
 
 	// After sorting, check the order
 	sorted := make([]gcloud.ProjectWorkstation, len(workstations))
 	copy(sorted, workstations)
 
-	// Simulate the sort from list.go
+	// Simulate the name sort from list.go
 	for i := range len(sorted) - 1 {
 		for j := i + 1; j < len(sorted); j++ {
-			a := sorted[i]
-			b := sorted[j]
-			var shouldSwap bool
-			switch {
-			case a.Cluster != b.Cluster:
-				shouldSwap = a.Cluster > b.Cluster
-			case a.Config != b.Config:
-				shouldSwap = a.Config > b.Config
-			default:
-				shouldSwap = a.Name > b.Name
-			}
-			if shouldSwap {
+			if sorted[i].Name > sorted[j].Name {
 				sorted[i], sorted[j] = sorted[j], sorted[i]
 			}
 		}
