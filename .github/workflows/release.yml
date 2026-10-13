@@ -35,9 +35,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          git push origin "$TAG_NAME"
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git "$TAG_NAME"
         env:
           GITHUB_EVENT_INPUTS_TAG_NAME: ${{ github.event.inputs.tag_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install osslsigncode
         run: sudo apt-get update && sudo apt-get install -y osslsigncode
