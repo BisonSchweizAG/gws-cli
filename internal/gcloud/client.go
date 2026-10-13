@@ -19,9 +19,10 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
-var pollInterval = 10 * time.Second
+const wsEnvUserName = "BISON_WORKSTATION_USER_NAME"
 
 var (
+	pollInterval = 10 * time.Second
 	clientMu     sync.Mutex
 	cachedClient *workstations.Client
 )
@@ -237,6 +238,19 @@ type Workstation struct {
 	Name    string
 }
 
+// ProjectWorkstation holds the details of a workstation listed from a GCP project,
+// including its current state, last update time, and the user from the config env.
+type ProjectWorkstation struct {
+	Project     string
+	Region      string
+	Cluster     string
+	Config      string
+	Name        string
+	State       workstationspb.Workstation_State
+	LastStarted *time.Time
+	User        string
+}
+
 func ListWorkstations(ctx context.Context, cfg *types.Config, project string) ([]Workstation, error) {
 	c, err := getClient(ctx, cfg)
 	if err != nil {
@@ -259,7 +273,7 @@ func ListWorkstations(ctx context.Context, cfg *types.Config, project string) ([
 			return listWorkstationsNested(ctx, c, project)
 		}
 
-		workstationsList = append(workstationsList, parseWorkstationName(ws.GetName()))
+		workstationsList = append(workstationsList, ParseWorkstationName(ws.GetName()))
 	}
 
 	return workstationsList, nil
@@ -306,7 +320,7 @@ func listWorkstationsNested(ctx context.Context, c *workstations.Client, project
 				if err != nil {
 					continue
 				}
-				workstationsList = append(workstationsList, parseWorkstationName(ws.GetName()))
+				workstationsList = append(workstationsList, ParseWorkstationName(ws.GetName()))
 			}
 		}
 	}
@@ -314,7 +328,9 @@ func listWorkstationsNested(ctx context.Context, c *workstations.Client, project
 	return workstationsList, nil
 }
 
-func parseWorkstationName(name string) Workstation {
+// ParseWorkstationName extracts the project, region, cluster, config and name
+// from a fully qualified workstation resource name.
+func ParseWorkstationName(name string) Workstation {
 	// projects/{project}/locations/{location}/workstationClusters/{cluster}/workstationConfigs/{config}/workstations/{workstation}
 	parts := strings.Split(name, "/")
 	if len(parts) >= 10 {
@@ -327,6 +343,83 @@ func parseWorkstationName(name string) Workstation {
 		}
 	}
 	return Workstation{}
+}
+
+// ListProjectWorkstations returns all workstations in a GCP project with their
+// current state and last updated/started timestamps. The cluster is obtained
+// from the current context, avoiding the need for ListWorkstationClusters.
+func ListProjectWorkstations(
+	ctx context.Context,
+	cfg *types.Config,
+	project, region, cluster string,
+) ([]ProjectWorkstation, error) {
+	c, err := getClient(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []ProjectWorkstation
+
+	// Build the cluster parent path from the current context
+	clusterParent := fmt.Sprintf("projects/%s/locations/%s/workstationClusters/%s", project, region, cluster)
+
+	// 1. List configs in this cluster
+	configIt := c.ListWorkstationConfigs(ctx, &workstationspb.ListWorkstationConfigsRequest{
+		Parent: clusterParent,
+	})
+	for {
+		config, err := configIt.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			continue
+		}
+
+		// 2. List workstations in this config
+		wsIt := c.ListWorkstations(ctx, &workstationspb.ListWorkstationsRequest{
+			Parent: config.GetName(),
+		})
+		for {
+			ws, err := wsIt.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				continue
+			}
+
+			parsed := ParseWorkstationName(ws.GetName())
+			pw := ProjectWorkstation{
+				Project: parsed.Project,
+				Region:  parsed.Region,
+				Cluster: parsed.Cluster,
+				Config:  parsed.Config,
+				Name:    parsed.Name,
+				State:   ws.GetState(),
+				User:    getWorkstationEnvVar(ws, wsEnvUserName),
+			}
+
+			if ws.GetStartTime() != nil {
+				t := ws.GetStartTime().AsTime()
+				pw.LastStarted = &t
+			}
+
+			results = append(results, pw)
+		}
+	}
+
+	return results, nil
+}
+
+// getWorkstationEnvVar returns the value of the named environment variable from
+// a workstation's environment, or an empty string if not found.
+func getWorkstationEnvVar(ws *workstationspb.Workstation, name string) string {
+	env := ws.GetEnv()
+	if env == nil {
+		return ""
+	}
+	return env[name]
 }
 
 func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
