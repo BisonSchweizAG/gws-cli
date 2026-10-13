@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/workstations/apiv1/workstationspb"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 
@@ -20,8 +21,13 @@ import (
 var listCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List all cloud workstations in the current context",
-	Aliases: []string{"ls"},
+	Aliases: []string{"ls", "ps"},
 	RunE: func(cmd *cobra.Command, _ []string) error {
+		// If invoked via "ps" alias, only show running workstations
+		runningOnly, _ := cmd.Flags().GetBool("running")
+		if cmd.CalledAs() == "ps" {
+			runningOnly = true
+		}
 		cfg, err := readConfig()
 		if err != nil {
 			return err
@@ -62,6 +68,20 @@ var listCmd = &cobra.Command{
 				nameMatch := strings.Contains(strings.ToLower(ws.Name), filterLower)
 				userMatch := strings.Contains(strings.ToLower(ws.User), filterLower)
 				if nameMatch || userMatch {
+					filtered = append(filtered, ws)
+				}
+			}
+			workstations = filtered
+		}
+
+		// Filter by running state (includes starting and stopping)
+		if runningOnly {
+			filtered := make([]gcloud.ProjectWorkstation, 0, len(workstations))
+			for _, ws := range workstations {
+				switch ws.State {
+				case workstationspb.Workstation_STATE_RUNNING,
+					workstationspb.Workstation_STATE_STARTING,
+					workstationspb.Workstation_STATE_STOPPING:
 					filtered = append(filtered, ws)
 				}
 			}
@@ -175,4 +195,5 @@ func init() {
 	listCmd.Flags().StringP("output", "o", "", "Output format. One of: wide")
 	listCmd.Flags().StringP("sort", "s", "last-started", "Sort by column: name, user, project, config, state, last-started")
 	listCmd.Flags().StringP("filter", "f", "", "Filter workstations by name or user (case-insensitive)")
+	listCmd.Flags().BoolP("running", "r", false, "Show only running workstations")
 }
