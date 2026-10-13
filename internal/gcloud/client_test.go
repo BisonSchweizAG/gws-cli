@@ -377,3 +377,243 @@ func Test_GetWorkstationStates_ExpectedShutdown(t *testing.T) {
 		})
 	}
 }
+
+func Test_ParseWorkstationName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected Workstation
+	}{
+		{
+			name:  "full path",
+			input: "projects/my-project/locations/us-central1/workstationClusters/my-cluster/workstationConfigs/my-config/workstations/my-ws",
+			expected: Workstation{
+				Project: "my-project",
+				Region:  "us-central1",
+				Cluster: "my-cluster",
+				Config:  "my-config",
+				Name:    "my-ws",
+			},
+		},
+		{
+			name:  "short path",
+			input: "a/b/c/d",
+			expected: Workstation{
+				Project: "",
+				Region:  "",
+				Cluster: "",
+				Config:  "",
+				Name:    "",
+			},
+		},
+		{
+			name:  "empty",
+			input: "",
+			expected: Workstation{
+				Project: "",
+				Region:  "",
+				Cluster: "",
+				Config:  "",
+				Name:    "",
+			},
+		},
+		{
+			name:  "extra segments",
+			input: "projects/p/locations/r/workstationClusters/c/workstationConfigs/cfg/workstations/w/extra",
+			expected: Workstation{
+				Project: "p",
+				Region:  "r",
+				Cluster: "c",
+				Config:  "cfg",
+				Name:    "w",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseWorkstationName(tt.input)
+			if got != tt.expected {
+				t.Errorf("ParseWorkstationName() = %+v, want %+v", got, tt.expected)
+			}
+		})
+	}
+}
+
+// listMockServer supports mocking the list methods for ListProjectWorkstations tests.
+type listMockServer struct {
+	workstationspb.UnimplementedWorkstationsServer
+	clusters     []*workstationspb.WorkstationCluster
+	configs      []*workstationspb.WorkstationConfig
+	workstations []*workstationspb.Workstation
+}
+
+func (m *listMockServer) ListWorkstationClusters(
+	ctx context.Context,
+	_ *workstationspb.ListWorkstationClustersRequest,
+) (*workstationspb.ListWorkstationClustersResponse, error) {
+	_ = ctx
+	return &workstationspb.ListWorkstationClustersResponse{
+		WorkstationClusters: m.clusters,
+	}, nil
+}
+
+func (m *listMockServer) ListWorkstationConfigs(
+	ctx context.Context,
+	_ *workstationspb.ListWorkstationConfigsRequest,
+) (*workstationspb.ListWorkstationConfigsResponse, error) {
+	_ = ctx
+	return &workstationspb.ListWorkstationConfigsResponse{
+		WorkstationConfigs: m.configs,
+	}, nil
+}
+
+func (m *listMockServer) ListWorkstations(
+	ctx context.Context,
+	_ *workstationspb.ListWorkstationsRequest,
+) (*workstationspb.ListWorkstationsResponse, error) {
+	_ = ctx
+	return &workstationspb.ListWorkstationsResponse{
+		Workstations: m.workstations,
+	}, nil
+}
+
+func Test_ListProjectWorkstations(t *testing.T) {
+	startTime := timestamppb.New(time.Now().Add(-1 * time.Hour))
+	updateTime := timestamppb.New(time.Now().Add(-30 * time.Minute))
+
+	configName := "projects/test-project/locations/us-central1/workstationClusters/test-cluster/workstationConfigs/test-config"
+
+	mockSrv := &listMockServer{
+		configs: []*workstationspb.WorkstationConfig{
+			{Name: configName},
+		},
+		workstations: []*workstationspb.Workstation{
+			{
+				Name:       configName + "/workstations/ws-1",
+				State:      workstationspb.Workstation_STATE_RUNNING,
+				StartTime:  startTime,
+				UpdateTime: updateTime,
+			},
+			{
+				Name:       configName + "/workstations/ws-2",
+				State:      workstationspb.Workstation_STATE_STOPPED,
+				UpdateTime: updateTime,
+			},
+		},
+	}
+
+	client, cleanup := setupTestClient(t, mockSrv)
+	defer cleanup()
+
+	clientMu.Lock()
+	cachedClient = client
+	clientMu.Unlock()
+	defer func() {
+		clientMu.Lock()
+		cachedClient = nil
+		clientMu.Unlock()
+	}()
+
+	cfg := &types.Config{
+		CurrentContextName: "test-ctx",
+		Contexts: map[string]*types.Context{
+			"test-ctx": {
+				GCloud: &types.GCloud{
+					Project: "test-project",
+					Region:  "us-central1",
+					Cluster: "test-cluster",
+					Config:  "test-config",
+					Name:    "ws-1",
+				},
+			},
+		},
+	}
+
+	results, err := ListProjectWorkstations(context.Background(), cfg, "test-project", "us-central1", "test-cluster")
+	if err != nil {
+		t.Fatalf("ListProjectWorkstations() error: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 workstations, got %d", len(results))
+	}
+
+	// Check ws-1
+	ws1 := results[0]
+	if ws1.Name != "ws-1" {
+		t.Errorf("ws1 name = %q, want %q", ws1.Name, "ws-1")
+	}
+	if ws1.Cluster != "test-cluster" {
+		t.Errorf("ws1 cluster = %q, want %q", ws1.Cluster, "test-cluster")
+	}
+	if ws1.Config != "test-config" {
+		t.Errorf("ws1 config = %q, want %q", ws1.Config, "test-config")
+	}
+	if ws1.State != workstationspb.Workstation_STATE_RUNNING {
+		t.Errorf("ws1 state = %v, want %v", ws1.State, workstationspb.Workstation_STATE_RUNNING)
+	}
+	if ws1.LastStarted == nil {
+		t.Error("ws1 LastStarted should be set")
+	}
+	if ws1.LastUpdated == nil {
+		t.Error("ws1 LastUpdated should be set")
+	}
+
+	// Check ws-2
+	ws2 := results[1]
+	if ws2.Name != "ws-2" {
+		t.Errorf("ws2 name = %q, want %q", ws2.Name, "ws-2")
+	}
+	if ws2.State != workstationspb.Workstation_STATE_STOPPED {
+		t.Errorf("ws2 state = %v, want %v", ws2.State, workstationspb.Workstation_STATE_STOPPED)
+	}
+	if ws2.LastStarted != nil {
+		t.Error("ws2 LastStarted should be nil (no start time set)")
+	}
+	if ws2.LastUpdated == nil {
+		t.Error("ws2 LastUpdated should be set")
+	}
+}
+
+func Test_ListProjectWorkstations_empty(t *testing.T) {
+	mockSrv := &listMockServer{
+		configs: []*workstationspb.WorkstationConfig{},
+	}
+
+	client, cleanup := setupTestClient(t, mockSrv)
+	defer cleanup()
+
+	clientMu.Lock()
+	cachedClient = client
+	clientMu.Unlock()
+	defer func() {
+		clientMu.Lock()
+		cachedClient = nil
+		clientMu.Unlock()
+	}()
+
+	cfg := &types.Config{
+		CurrentContextName: "test-ctx",
+		Contexts: map[string]*types.Context{
+			"test-ctx": {
+				GCloud: &types.GCloud{
+					Project: "test-project",
+					Region:  "us-central1",
+					Cluster: "test-cluster",
+					Config:  "test-config",
+					Name:    "ws-1",
+				},
+			},
+		},
+	}
+
+	results, err := ListProjectWorkstations(context.Background(), cfg, "test-project", "us-central1", "test-cluster")
+	if err != nil {
+		t.Fatalf("ListProjectWorkstations() error: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("expected 0 workstations, got %d", len(results))
+	}
+}
