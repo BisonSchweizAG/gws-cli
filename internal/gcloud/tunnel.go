@@ -64,7 +64,7 @@ func TCPTunnelWithPassphrase(ctx context.Context, cfg *types.Config, port int) e
 	}
 	defer closeIt(listener)
 
-	log.Logf("🕳️ Opening tunnel to %s and listening on local ssh port %d ...", sshContext.GCloud.Name, p)
+	log.Logf("📡 Opening tunnel to %s and listening on local ssh port %d ...", sshContext.GCloud.Name, p)
 
 	var postConnectOnce sync.Once
 	postConnectOnce.Do(func() {
