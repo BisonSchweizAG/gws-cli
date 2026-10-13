@@ -143,10 +143,13 @@ func (u *Updater) Latest(ctx context.Context) (*Release, error) {
 }
 
 // IsNewer reports whether candidate is a higher version than current.
-// It returns ErrUnknownVersion if current is not a plain release version
-// (dev builds, or goreleaser snapshots such as "v1.2.3-next").
+// It returns ErrUnknownVersion if current is not a recognizable version
+// (e.g. "dev").  Goreleaser snapshot versions like "v0.0.0-next" are accepted
+// and compared against the base version (v0.0.0).  Other prereleases
+// (e.g. "v1.2.3-rc.1") are rejected.
 func IsNewer(current, candidate string) (bool, error) {
 	cur := withV(current)
+	cur = stripSnapshot(cur)
 	if !semver.IsValid(cur) || semver.Prerelease(cur) != "" {
 		return false, fmt.Errorf("%w: %q", ErrUnknownVersion, current)
 	}
@@ -155,6 +158,16 @@ func IsNewer(current, candidate string) (bool, error) {
 		return false, fmt.Errorf("invalid version %q", candidate)
 	}
 	return semver.Compare(cand, cur) > 0, nil
+}
+
+// stripSnapshot removes a trailing "-next" prerelease suffix that goreleaser
+// appends to snapshot builds (e.g. "v0.0.0-next" -> "v0.0.0").
+func stripSnapshot(v string) string {
+	const suffix = "-next"
+	if strings.HasSuffix(v, suffix) {
+		return strings.TrimSuffix(v, suffix)
+	}
+	return v
 }
 
 // isReleaseTag reports whether tag looks like a tag created by a release:

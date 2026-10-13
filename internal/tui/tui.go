@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/types"
+	"github.com/bisonschweizag/gws-cli/internal/update"
 	"github.com/bisonschweizag/gws-cli/version"
 )
 
@@ -40,6 +42,9 @@ type Model struct {
 	AuthURL           string
 	CopiedToClipboard bool
 	ClipboardMsg      string
+
+	// New version notification
+	NewVersionAvailable string
 
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
@@ -87,10 +92,11 @@ func (m *Model) LastLog() string {
 }
 
 type (
-	logMsg     string
-	authURLMsg string
-	errMsg     struct{ err error }
-	opDoneMsg  struct{}
+	logMsg                 string
+	authURLMsg             string
+	errMsg                 struct{ err error }
+	opDoneMsg              struct{}
+	newVersionAvailableMsg struct{ latestVersion string }
 )
 
 func (m *Model) Init() tea.Cmd {
@@ -116,7 +122,29 @@ func (m *Model) Init() tea.Cmd {
 		m.waitForLog(),
 		m.waitForAuthURL(),
 		m.Spinner.Tick,
+		checkForNewVersion,
 	)
+}
+
+// checkForNewVersion queries the GitHub releases API to see if a newer version is available.
+func checkForNewVersion() tea.Msg {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	u := update.New()
+
+	latest, err := u.Latest(ctx)
+	if err != nil {
+		return fmt.Errorf("check for updates: %w", err)
+	}
+
+	isNewer, err := update.IsNewer(version.Version, latest.Tag)
+
+	if err != nil || !isNewer {
+		return nil
+	}
+
+	return newVersionAvailableMsg{latestVersion: latest.Tag}
 }
 
 func (m *Model) waitForLog() tea.Cmd {
@@ -184,6 +212,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Err = msg.err
 		m.Done = true
 		return m, nil
+	case newVersionAvailableMsg:
+		m.NewVersionAvailable = msg.latestVersion
+		return m, nil
 	case opDoneMsg:
 		m.Done = true
 		if m.AutoQuit {
@@ -216,7 +247,15 @@ func (m *Model) View() tea.View {
 	if m.Config != nil {
 		currCtx = m.Config.CurrentContext()
 	}
-	fmt.Fprintf(&left, "  Version:     %s\n", m.Styles.Info.Render(version.Version))
+	versionLine := m.Styles.Info.Render(version.Version)
+	if m.NewVersionAvailable != "" {
+		versionLine = fmt.Sprintf(
+			"%s %s",
+			versionLine,
+			m.Styles.Badge.Render(fmt.Sprintf("🚨 %s available", m.NewVersionAvailable)),
+		)
+	}
+	fmt.Fprintf(&left, "  Version:     %s\n", versionLine)
 	if m.Config != nil && m.Config.FilePath != "" {
 		fmt.Fprintf(&left, "  Config File: %s\n", m.Config.FilePath)
 	}

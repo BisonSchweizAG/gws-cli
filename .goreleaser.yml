@@ -53,7 +53,7 @@ signs:
       - "--yes"
     artifacts: checksum
 snapshot:
-  version_template: "{{ .Tag }}-next"
+  version_template: "{{ .Version }}-next"
 sboms:
   - artifacts: archive
 changelog:
