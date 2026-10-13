@@ -32,10 +32,12 @@ jobs:
         id: latest_release
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          INPUTS_RELEASE_TAG: ${{ inputs.release_tag }}
+          GITHUB_EVENT_RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          RELEASE_TAG=${{ inputs.release_tag }}
+          RELEASE_TAG=${INPUTS_RELEASE_TAG}
           if [ -z "$RELEASE_TAG" ]; then
-            RELEASE_TAG=${{ github.event.release.tag_name }}
+            RELEASE_TAG=${GITHUB_EVENT_RELEASE_TAG_NAME}
           fi
           if [ -z "$RELEASE_TAG" ]; then
             RELEASE_TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
