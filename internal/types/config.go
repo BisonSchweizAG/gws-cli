@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -131,12 +130,11 @@ func (c *Config) Load(fileName string) error {
 		currentChanged = true
 	}
 
-	if c.CurrentContextName == "" {
-		if len(c.Contexts) == 1 {
-			for k := range maps.Keys(c.Contexts) {
-				c.CurrentContextName = k
-				currentChanged = true
-			}
+	if c.CurrentContextName == "" && len(c.Contexts) > 0 {
+		for k := range c.Contexts {
+			c.CurrentContextName = k
+			currentChanged = true
+			break
 		}
 	}
 

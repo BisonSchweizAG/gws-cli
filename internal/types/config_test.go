@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -207,5 +208,103 @@ func TestConfig_AuthChannels(t *testing.T) {
 		}
 	default:
 		t.Error("expected url to be delivered")
+	}
+}
+
+func TestConfig_Load_invalidCurrentContext_fallbackToFirst(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
+
+	tests := []struct {
+		name            string
+		yamlContent     string
+		expectedContext string
+	}{
+		{
+			name: "invalid currentContext with multiple contexts picks one",
+			yamlContent: fmt.Sprintf(`currentContext: nonexistent
+contexts:
+  beta:
+    host: beta.example.com
+    port: 22
+    user: user
+    files:
+      - sourcePath: %s
+        path: /dest
+  alpha:
+    host: alpha.example.com
+    port: 22
+    user: user
+    files:
+      - sourcePath: %s
+        path: /dest
+`, tmpFile.Name(), tmpFile.Name()),
+			expectedContext: "", // any context is acceptable
+		},
+		{
+			name: "empty currentContext with multiple contexts picks one",
+			yamlContent: fmt.Sprintf(`currentContext: ""
+contexts:
+  beta:
+    host: beta.example.com
+    port: 22
+    user: user
+    files:
+      - sourcePath: %s
+        path: /dest
+  alpha:
+    host: alpha.example.com
+    port: 22
+    user: user
+    files:
+      - sourcePath: %s
+        path: /dest
+`, tmpFile.Name(), tmpFile.Name()),
+			expectedContext: "", // any context is acceptable
+		},
+		{
+			name: "empty currentContext with single context picks that context",
+			yamlContent: fmt.Sprintf(`contexts:
+  only:
+    host: only.example.com
+    port: 22
+    user: user
+    files:
+      - sourcePath: %s
+        path: /dest
+`, tmpFile.Name()),
+			expectedContext: "only",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfgFile := t.TempDir() + "/config.yaml"
+			if err := os.WriteFile(cfgFile, []byte(tt.yamlContent), 0o600); err != nil {
+				t.Fatalf("failed to write config file: %v", err)
+			}
+
+			cfg := &Config{}
+			err := cfg.Load(cfgFile)
+			if err != nil {
+				t.Fatalf("Load() returned error: %v", err)
+			}
+
+			if cfg.CurrentContextName == "" {
+				t.Error("CurrentContextName should not be empty")
+			}
+			if cfg.CurrentContext() == nil {
+				t.Error("CurrentContext() returned nil")
+			}
+			// For single-context case, verify the exact name
+			if tt.expectedContext != "" && cfg.CurrentContextName != tt.expectedContext {
+				t.Errorf("CurrentContextName = %q, want %q", cfg.CurrentContextName, tt.expectedContext)
+			}
+		})
 	}
 }
