@@ -39,8 +39,9 @@ var listCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		wide := output == "wide"
 		sortBy, _ := cmd.Flags().GetString("sort")
+		filter, _ := cmd.Flags().GetString("filter")
 
-		validSorts := []string{"name", "config", "state", "last-started"}
+		validSorts := []string{"name", "user", "project", "config", "state", "last-started"}
 		if !slices.Contains(validSorts, sortBy) {
 			return fmt.Errorf("invalid sort option %q, must be one of: %s", sortBy, strings.Join(validSorts, ", "))
 		}
@@ -53,10 +54,28 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
+		// Filter by name and user (case-insensitive)
+		if filter != "" {
+			filterLower := strings.ToLower(filter)
+			filtered := make([]gcloud.ProjectWorkstation, 0, len(workstations))
+			for _, ws := range workstations {
+				nameMatch := strings.Contains(strings.ToLower(ws.Name), filterLower)
+				userMatch := strings.Contains(strings.ToLower(ws.User), filterLower)
+				if nameMatch || userMatch {
+					filtered = append(filtered, ws)
+				}
+			}
+			workstations = filtered
+		}
+
 		slices.SortFunc(workstations, func(a, b gcloud.ProjectWorkstation) int {
 			switch sortBy {
 			case "name":
 				return strings.Compare(a.Name, b.Name)
+			case "user":
+				return strings.Compare(a.User, b.User)
+			case "project":
+				return strings.Compare(a.Project, b.Project)
 			case "config":
 				return strings.Compare(a.Config, b.Config)
 			case "state":
@@ -154,5 +173,6 @@ func compareDate(a, b *time.Time) int {
 func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.Flags().StringP("output", "o", "", "Output format. One of: wide")
-	listCmd.Flags().StringP("sort", "s", "last-started", "Sort by column: name, config, state, last-started")
+	listCmd.Flags().StringP("sort", "s", "last-started", "Sort by column: name, user, project, config, state, last-started")
+	listCmd.Flags().StringP("filter", "f", "", "Filter workstations by name or user (case-insensitive)")
 }
