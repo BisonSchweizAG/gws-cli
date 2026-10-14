@@ -71,7 +71,7 @@ func LoadToken() (*oauth2.Token, error) {
 }
 
 func SaveToken(token oauth2.Token) error {
-	log.Logf("🎟️ Got new Google Access Token (expires: %s)", token.Expiry.Format(time.RFC822))
+	log.Logf("🎟 Got new Google Access Token (expires: %s)", token.Expiry.Format(time.RFC822))
 	// Encode token to YAML once and reuse for both keyring and file storage
 	storage := TokenStorage{Token: token}
 
@@ -86,7 +86,7 @@ func SaveToken(token oauth2.Token) error {
 
 	err = keyring.Set("gws", "token", buf.String())
 	if err == nil {
-		log.Logf("🎟️ Stored token in OS keyring")
+		log.Logf("🎟 Stored token in OS keyring")
 		return nil
 	}
 	log.Logf("Keyring write error: %v; falling back to file storage", err)
