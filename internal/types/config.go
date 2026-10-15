@@ -216,6 +216,13 @@ func DefaultConfigPaths() (newConfigPath, configDir, userHomeDir string) {
 }
 
 func (c *Config) SwitchContext(newContext string, force bool) error {
+	// Allow empty context when no contexts are defined (e.g., during initial setup)
+	if newContext == "" && len(c.Contexts) == 0 {
+		c.CurrentContextName = ""
+		c.currentContext = nil
+		return nil
+	}
+
 	if _, ok := c.Contexts[newContext]; !ok {
 		return fmt.Errorf("context with name %q not defined", newContext)
 	}
