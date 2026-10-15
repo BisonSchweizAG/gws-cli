@@ -40,7 +40,7 @@ func getClient(ctx context.Context, cfg *types.Config) (*workstations.Client, er
 		return cachedClient, nil
 	}
 
-	tokenSource, err := Login(ctx, cfg)
+	tokenSource, err := Login(ctx, cfg, true)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ type Project struct {
 }
 
 func ListProjects(ctx context.Context, cfg *types.Config) ([]Project, error) {
-	tokenSource, err := Login(ctx, cfg)
+	tokenSource, err := Login(ctx, cfg, true)
 	if err != nil {
 		return nil, err
 	}

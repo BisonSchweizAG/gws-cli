@@ -42,7 +42,7 @@ func TestLogin_Browser_AuthURL(t *testing.T) {
 
 	errChan := make(chan error, 1)
 	go func() {
-		_, err := Login(ctx, cfg)
+		_, err := Login(ctx, cfg, true)
 		errChan <- err
 	}()
 

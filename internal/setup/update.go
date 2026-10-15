@@ -37,7 +37,7 @@ func (m Model) Init() tea.Cmd {
 
 	return tea.Batch(
 		func() tea.Msg {
-			_, err := gcloud.Login(context.Background(), m.Config)
+			_, err := gcloud.Login(context.Background(), m.Config, true)
 			if err != nil {
 				return errMsg(err)
 			}
