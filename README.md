@@ -408,3 +408,20 @@ your `~/.bashrc` or `~/.zshrc` in Termux to make it permanent.
 
 The configuration file is stored at `~/.config/gws/config.yaml` (same as other platforms). Use `gws setup` to create
 an initial configuration interactively.
+
+### Troubleshooting
+
+If you see an error like `unknown command "/data/data/com.termux/files/home/gws"`, it means the binary path is being
+passed as an argument. Make sure you're running the binary correctly:
+
+```bash
+# Correct
+./gws status
+gws status
+
+# Incorrect - don't pass the binary path as an argument
+./gws /data/data/com.termux/files/home/gws status
+```
+
+This can happen if you have a wrapper script or alias that incorrectly passes the binary path. Make sure you're calling
+the binary directly with the subcommand.
