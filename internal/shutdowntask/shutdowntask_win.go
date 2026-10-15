@@ -6,10 +6,47 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"text/template"
 )
 
-const shutdownTaskName = "GWS-StopOnShutdown"
+const shutdownTaskName = `\gws\GWS-StopOnShutdown`
+
+// taskXMLTemplate is the Windows Task Scheduler XML template.
+// It triggers on System event 1074 (User32) only for shutdown/power off, not restart.
+const taskXMLTemplate = `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Stops all GWS workstations when Windows shuts down</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <EventTrigger>
+      <Enabled>true</Enabled>
+      <Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[Provider[@Name='User32'] and EventID=1074]] and *[EventData[Data[@Name='param5']='power off' or Data[@Name='param5']='shutdown']]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription>
+    </EventTrigger>
+  </Triggers>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>false</StartWhenAvailable>
+    <Enabled>true</Enabled>
+    <ExecutionTimeLimit>PT1M</ExecutionTimeLimit>
+  </Settings>
+  <Actions>
+    <Exec>
+      <Command>{{.Command}}</Command>
+      <Arguments>{{.Arguments}}</Arguments>
+    </Exec>
+  </Actions>
+</Task>`
+
+type taskXMLData struct {
+	Command   string
+	Arguments string
+}
 
 // registerShutdownTask creates a Windows scheduled task that runs "gws stop --all" on shutdown.
 func registerShutdownTask() error {
@@ -25,15 +62,27 @@ func registerShutdownTask() error {
 		return nil
 	}
 
-	// Task doesn't exist, create it.
-	// Use ONEVENT trigger with XPath query for System log, event ID 1074 (shutdown/restart).
+	// Write the task XML to a temporary file.
+	tmpDir := os.TempDir()
+	tmpFile := filepath.Join(tmpDir, shutdownTaskName+".xml")
+	tmpl, err := template.New("task").Parse(taskXMLTemplate)
+	if err != nil {
+		return fmt.Errorf("parse task template: %w", err)
+	}
+	data := taskXMLData{
+		Command:   execPath,
+		Arguments: "stop --all",
+	}
+	if err := os.WriteFile(tmpFile, mustRender(tmpl, data), 0644); err != nil {
+		return fmt.Errorf("write task XML: %w", err)
+	}
+	defer os.Remove(tmpFile)
+
+	// Create the task from the XML file.
 	createCmd := exec.Command("schtasks",
 		"/create",
 		"/tn", shutdownTaskName,
-		"/tr", fmt.Sprintf(`"%s" stop --all`, execPath),
-		"/sc", "ONEVENT",
-		"/ec", "System",
-		"/mo", `[System/EventID=1074]`,
+		"/xml", tmpFile,
 	)
 	output, err := createCmd.CombinedOutput()
 	if err != nil {
@@ -41,6 +90,15 @@ func registerShutdownTask() error {
 	}
 	fmt.Printf("Shutdown task %q registered successfully.\n", shutdownTaskName)
 	return nil
+}
+
+// mustRender renders the template and panics on error (should never happen with static templates).
+func mustRender(tmpl *template.Template, data any) []byte {
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, data); err != nil {
+		panic(fmt.Sprintf("render task template: %w", err))
+	}
+	return []byte(buf.String())
 }
 
 // unregisterShutdownTask removes the Windows scheduled task.
