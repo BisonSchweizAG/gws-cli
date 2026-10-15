@@ -14,6 +14,7 @@ import (
 
 var (
 	flagStopAll bool
+	flagStopNow bool
 
 	// stopCmd represents the stop command.
 	stopCmd = &cobra.Command{
@@ -27,6 +28,12 @@ var (
 
 			spinner.Disable()
 			m := tui.NewModel(cmd.Context(), cfg, ">_ GWS Stop", func(ctx context.Context) error {
+				if flagStopNow {
+					if flagStopAll {
+						return gcloud.StopAllWorkstationsNow(ctx, cfg)
+					}
+					return gcloud.StopWorkstationNow(ctx, cfg)
+				}
 				if flagStopAll {
 					return gcloud.StopAllWorkstations(ctx, cfg)
 				}
@@ -51,4 +58,6 @@ func init() {
 	rootCmd.AddCommand(stopCmd)
 	stopCmd.PersistentFlags().
 		BoolVar(&flagStopAll, "all", false, "Stop all workstations")
+	stopCmd.PersistentFlags().
+		BoolVar(&flagStopNow, "now", false, "Send stop command and return immediately without waiting")
 }
