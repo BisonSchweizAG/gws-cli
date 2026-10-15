@@ -384,6 +384,18 @@ chmod +x gws
 mv gws $HOME/.local/bin/
 ```
 
+### Building from Source
+
+To build the Android binary from source, set the Google OAuth client credentials as environment variables:
+
+```bash
+export GOOGLE_OIDC_CLIENT_ID="your-client-id"
+export GOOGLE_OIDC_CLIENT_SECRET="your-client-secret"
+make build-android
+```
+
+Without these variables, the binary will not be able to authenticate with Google Cloud.
+
 ### Authentication
 
 Use the `gws login` command to authenticate. Since the Android browser cannot reach a local HTTP server in Termux,

@@ -130,8 +130,8 @@ func LoginSimple(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, er
 	localOAuth.ClientID = ClientID
 	localOAuth.ClientSecret = ClientSecret
 	localOAuth.Scopes = CloudScopes
-	// Use installed-app redirect URI so Google returns the code in the URL fragment
-	localOAuth.RedirectURL = "urn:ietf:params:oauth:client-type:installed-app"
+	// Use OOB redirect URI for Desktop app clients so Google displays the code on a page
+	localOAuth.RedirectURL = "urn:ietf:wg:oauth:2.0:oob"
 
 	options := []oauth2.AuthCodeOption{
 		oauth2.AccessTypeOffline,

@@ -36,13 +36,13 @@ fmt: tb.golines tb.gofumpt
 	$(TB_GOLINES) --base-formatter="$(TB_GOFUMPT)" --max-len=120 --write-output .
 
 build-win:
-	GOOS=windows GOARCH=amd64 go build -trimpath -o gws.exe -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M)" .
+	GOOS=windows GOARCH=amd64 go build -trimpath -o gws.exe -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M) -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientID=$${GOOGLE_OIDC_CLIENT_ID} -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientSecret=$${GOOGLE_OIDC_CLIENT_SECRET}" .
 
 build-mac:
-	GOOS=darwin GOARCH=arm64 go build -trimpath -o gws -buildvcs=false -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M)" .
+	GOOS=darwin GOARCH=arm64 go build -trimpath -o gws -buildvcs=false -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M) -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientID=$${GOOGLE_OIDC_CLIENT_ID} -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientSecret=$${GOOGLE_OIDC_CLIENT_SECRET}" .
 
 build-android:
-	GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o gws -buildvcs=false -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M)" .
+	GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o gws -buildvcs=false -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M) -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientID=$${GOOGLE_OIDC_CLIENT_ID} -X github.com/bisonschweizag/gws-cli/internal/gcloud.ClientSecret=$${GOOGLE_OIDC_CLIENT_SECRET}" .
 
 check-vulnerabilities:
 	go run golang.org/x/vuln/cmd/govulncheck@latest -show verbose,color ./...
