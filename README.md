@@ -308,7 +308,7 @@ jetbrainsGateway:
       chrome)
 - `jetbrainsGateway`: Optional JetBrains Gateway configuration.
     - `downloadDestination`: The directory where JetBrains programs are downloaded.
-- `terminateOnShutdown`: If set to `true`, the TUI listens for real system shutdown events (not reboot) and automatically stops all workstations. On Linux, it uses D-Bus to detect systemd-logind shutdown signals. On macOS, it uses Darwin notifications to detect loginwindow shutdown events.
+- `terminateOnShutdown`: If set to `true`, the TUI listens for real system shutdown events (not reboot) and automatically stops all workstations. On Linux, it uses D-Bus to detect systemd-logind shutdown signals. On macOS, it uses Darwin notifications to detect loginwindow shutdown events. On Windows, it uses SetConsoleCtrlHandler to detect system shutdown and user logoff events.
 
 ## Setup in JetBrains Gateway
 
