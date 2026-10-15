@@ -1,4 +1,4 @@
-//go:build aix || dragonfly || freebsd || (js && wasm) || linux || nacl || netbsd || openbsd || solaris
+//go:build aix || android || dragonfly || freebsd || (js && wasm) || linux || nacl || netbsd || openbsd || solaris
 
 package gcloud
 

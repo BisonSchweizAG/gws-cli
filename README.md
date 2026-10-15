@@ -361,3 +361,50 @@ On some systems, MacOS may block the execution of the gws binary. To allow the g
 downloaded it from this repository. Then you open a terminal and execute the following command, where ```gws``` is the full path to gws binary :
 
 ```sudo xattr -d com.apple.quarantine gws```
+
+## Android / Termux
+
+You can run `gws` on Android using [Termux](https://termux.com/), a terminal emulator for Android.
+
+### Installation
+
+1. Install Termux from [F-Droid](https://f-droid.org/packages/com.termux/) (recommended) or the Google Play Store.
+2. Download the Android release binary from the [latest release](https://github.com/BisonSchweizAG/gws-cli/releases/latest)
+   (look for the `android_arm64` archive).
+3. Extract the binary and make it executable:
+
+```bash
+tar xzf gws_*_android_arm64.tar.gz
+chmod +x gws
+```
+
+4. Optionally, move the binary to a directory in your `$PATH`:
+
+```bash
+mv gws $HOME/.local/bin/
+```
+
+### Authentication
+
+The first time you run `gws`, it will prompt you to authenticate with Google Cloud. Since Termux doesn't have a
+web browser, the auth URL will be printed to the terminal. Copy and paste this URL into your browser on any device
+to complete authentication. The authorization code will be displayed, and you can paste it back into the Termux
+session.
+
+### DNS Resolution
+
+If you encounter DNS resolution issues (e.g., `dial tcp: lookup ...: no such host`), set the `GODEBUG` environment
+variable before running `gws`:
+
+```bash
+export GODEBUG=netdns=go
+gws status
+```
+
+This forces Go to use its pure-Go DNS resolver, which works better on Android's Bionic libc. You can add this to
+your `~/.bashrc` or `~/.zshrc` in Termux to make it permanent.
+
+### Configuration
+
+The configuration file is stored at `~/.config/gws/config.yaml` (same as other platforms). Use `gws setup` to create
+an initial configuration interactively.

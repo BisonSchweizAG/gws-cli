@@ -41,5 +41,8 @@ build-win:
 build-mac:
 	GOOS=darwin GOARCH=arm64 go build -trimpath -o gws -buildvcs=false -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M)" .
 
+build-android:
+	GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o gws -buildvcs=false -ldflags="-s -w -X github.com/bisonschweizag/gws-cli/version.Version=dev-$$(date +%Y%m%d-%H%M)" .
+
 check-vulnerabilities:
 	go run golang.org/x/vuln/cmd/govulncheck@latest -show verbose,color ./...
