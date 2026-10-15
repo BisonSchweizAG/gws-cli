@@ -11,12 +11,13 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
-func openBrowser(ctx context.Context, cfg *types.Config, authURL string) {
+// OpenBrowser opens the given URL in the default browser.
+func OpenBrowser(_ context.Context, cfg *types.Config, authURL string) {
 	var cmd *exec.Cmd
 	if IsWSL() {
-		cmd = windowsCmd(ctx, cfg, authURL)
+		cmd = windowsCmd(context.Background(), cfg, authURL)
 	} else {
-		cmd = exec.CommandContext(ctx, "xdg-open", authURL)
+		cmd = exec.CommandContext(context.Background(), "xdg-open", authURL)
 	}
 	_ = cmd.Start()
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
-func openBrowser(ctx context.Context, _ *types.Config, authURL string) {
-	_ = exec.CommandContext(ctx, "open", authURL).Start()
+// OpenBrowser opens the given URL in the default browser.
+func OpenBrowser(_ context.Context, _ *types.Config, authURL string) {
+	_ = exec.CommandContext(context.Background(), "open", authURL).Start()
 }

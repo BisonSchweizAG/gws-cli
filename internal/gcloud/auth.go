@@ -146,7 +146,7 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 
 	// Open URL in browser
 	log.Log("Opening browser for authentication...")
-	openBrowser(ctx, cfg, authURL)
+	OpenBrowser(ctx, cfg, authURL)
 
 	// Create a channel for shutdown signaling that can carry a token or an error.
 	type authResult struct {

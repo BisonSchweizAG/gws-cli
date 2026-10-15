@@ -124,6 +124,15 @@ gws tunnel --restart
 | `--check-token`         | Enable periodic token check (default: `true`)                     |
 | `--restart`             | Restart the workstation before opening the tunnel                 |
 
+#### `gws launch [context]`
+
+Open the default web URL of the cloud workstation in your browser.
+
+```bash
+gws launch
+gws launch my-workstation
+```
+
 #### `gws up`
 
 Upload files and directories to the workstation as defined in the context configuration.

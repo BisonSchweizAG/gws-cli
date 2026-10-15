@@ -201,6 +201,32 @@ func setup(
 	return sshContext, c, wsc, ws, err
 }
 
+// GetWorkstationState returns the current state of the configured workstation.
+func GetWorkstationState(ctx context.Context, cfg *types.Config) (workstationspb.Workstation_State, error) {
+	_, _, _, ws, err := setup(ctx, cfg) //nolint:dogsled
+	if err != nil {
+		return workstationspb.Workstation_STATE_UNSPECIFIED, fmt.Errorf("failed to get workstation: %w", err)
+	}
+	return ws.GetState(), nil
+}
+
+// GetWorkstationURL returns the default web URL for the configured workstation.
+// It fetches the workstation from the GCP API and returns its host field,
+// which is the URL used to access the workstation in a browser.
+func GetWorkstationURL(ctx context.Context, cfg *types.Config) (string, error) {
+	sshCtx, _, _, ws, err := setup(ctx, cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to get workstation: %w", err)
+	}
+
+	host := ws.GetHost()
+	if host == "" {
+		return "", fmt.Errorf("workstation %q has no host URL", sshCtx.GCloud.Name)
+	}
+
+	return host, nil
+}
+
 type Project struct {
 	ID   string
 	Name string
@@ -432,6 +458,7 @@ func getWorkstationEnvVar(ws *workstationspb.Workstation, name string) string {
 
 func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
 	var errs []error
+	var stopped []string
 	currContext := cfg.CurrentContextName
 	defer func() { _ = cfg.SwitchContext(currContext, true) }()
 	for name := range cfg.Contexts {
@@ -441,7 +468,12 @@ func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
 		}
 		if err := StopWorkstation(ctx, cfg); err != nil {
 			errs = append(errs, err)
+		} else {
+			stopped = append(stopped, cfg.CurrentContextName)
 		}
+	}
+	if len(stopped) > 0 {
+		log.Logf("Stopped workstations: %s", stopped)
 	}
 	return errors.Join(errs...)
 }
