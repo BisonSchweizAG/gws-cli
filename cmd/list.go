@@ -131,7 +131,7 @@ var listCmd = &cobra.Command{
 					ws.Name,
 					ws.User,
 					formatState(ws.State),
-					formatDateTime(ws.LastStarted),
+					formatDate(ws.LastStarted),
 				})
 			} else {
 				rows = append(rows, table.Row{
