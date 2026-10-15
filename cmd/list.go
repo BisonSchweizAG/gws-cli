@@ -117,6 +117,7 @@ var listCmd = &cobra.Command{
 				"USER",
 				"STATE",
 				"LAST STARTED",
+				"CREATED",
 			}
 		} else {
 			header = table.Row{"NAME", "USER", "STATE", "LAST STARTED"}
@@ -132,6 +133,7 @@ var listCmd = &cobra.Command{
 					ws.User,
 					formatState(ws.State),
 					formatDate(ws.LastStarted),
+					formatDate(ws.CreatedDate),
 				})
 			} else {
 				rows = append(rows, table.Row{

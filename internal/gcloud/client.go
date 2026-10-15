@@ -248,6 +248,7 @@ type ProjectWorkstation struct {
 	Name        string
 	State       workstationspb.Workstation_State
 	LastStarted *time.Time
+	CreatedDate *time.Time
 	User        string
 }
 
@@ -403,6 +404,11 @@ func ListProjectWorkstations(
 			if ws.GetStartTime() != nil {
 				t := ws.GetStartTime().AsTime()
 				pw.LastStarted = &t
+			}
+
+			if ws.GetCreateTime() != nil {
+				t := ws.GetCreateTime().AsTime()
+				pw.CreatedDate = &t
 			}
 
 			results = append(results, pw)
