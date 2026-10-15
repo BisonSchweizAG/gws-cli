@@ -130,6 +130,7 @@ func (m *Model) Init() tea.Cmd {
 
 	// Listen for system shutdown signals if configured
 	if m.Config != nil && m.Config.TerminateOnShutdown {
+		log.Log("🪝 Shutdown hook enabled — will stop workstations on system shutdown")
 		cmds = append(cmds, m.waitForShutdown())
 	}
 
@@ -249,7 +250,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case shutdownMsg:
 		// System is shutting down — stop all workstations
-		log.Log("System shutdown detected, stopping all workstations...")
+		log.Log("🔌 System shutdown detected — stopping all workstations...")
 		_ = gcloud.StopAllWorkstations(context.Background(), m.Config)
 		m.Quitting = true
 		m.cancel()
