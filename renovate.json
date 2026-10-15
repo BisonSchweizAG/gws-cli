@@ -1,27 +1,5 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    ":gitSignOff",
-    ":semanticCommits",
-    ":enableVulnerabilityAlerts",
-    "helpers:pinGitHubActionDigests"
-  ],
-  "vulnerabilityAlerts": {
-    "enabled": true,
-    "groupName": "security updates"
-  },
-  "packageRules": [
-    {
-      "matchManagers": [
-        "gomod"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "automerge": true
-    }
-  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -35,8 +13,30 @@
       ]
     }
   ],
+  "dependencyDashboard": true,
+  "extends": [
+    ":gitSignOff",
+    ":semanticCommits",
+    ":enableVulnerabilityAlerts",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "packageRules": [
+    {
+      "automerge": true,
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    }
+  ],
   "postUpdateOptions": [
     "gomodTidy"
   ],
-  "dependencyDashboard": true
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "groupName": "security updates"
+  }
 }
