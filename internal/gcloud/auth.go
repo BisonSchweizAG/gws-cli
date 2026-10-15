@@ -1,6 +1,7 @@
 package gcloud
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,7 +10,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/phayes/freeport"
@@ -62,6 +65,119 @@ func generatePKCE() (codeVerifier, codeChallenge string, err error) {
 	// Base64 URL encode the hash to create the code challenge
 	codeChallenge = base64.RawURLEncoding.EncodeToString(hash[:])
 	return codeVerifier, codeChallenge, nil
+}
+
+// authResult carries a token or an error from the OAuth callback handler.
+type authResult struct {
+	token *oauth2.Token
+	err   error
+}
+
+// CodeLogin performs OAuth login without a local HTTP server. It prints the auth URL and prompts
+// the user to paste the authorization code from the browser redirect URL, suitable for Termux and
+// other environments where the browser cannot reach a localhost server.
+func CodeLogin(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
+	if cfg == nil {
+		return nil, errors.New("cfg must be provided")
+	}
+
+	httpClient := &http.Client{
+		Transport: &userAgentTransport{
+			base: http.DefaultTransport,
+			ua:   userAgent,
+		},
+	}
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+
+	var existingToken oauth2.Token
+	if cfg.Token != nil {
+		existingToken = cfg.Token.Token
+	}
+
+	// Try refreshing the token first
+	if existingToken.RefreshToken != "" {
+		tokenSource := oauthConfig.TokenSource(ctx, &existingToken)
+		token, err := tokenSource.Token()
+		if err == nil {
+			_ = cfg.SetToken(*token)
+			return newTokenSourceWithRefreshCheck(ctx, token, cfg, oauthConfig), nil
+		}
+		if oauthConfig.ClientID != ClientID {
+			gcloudOAuth := *oauthConfig
+			gcloudOAuth.ClientID = ClientID
+			gcloudOAuth.ClientSecret = ClientSecret
+			tokenSource = gcloudOAuth.TokenSource(ctx, &existingToken)
+			token, err = tokenSource.Token()
+			if err == nil {
+				_ = cfg.SetToken(*token)
+				return newTokenSourceWithRefreshCheck(ctx, token, cfg, &gcloudOAuth), nil
+			}
+		}
+	}
+
+	codeVerifier, codeChallenge, err := generatePKCE()
+	if err != nil {
+		return nil, err
+	}
+
+	state := "state"
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err == nil {
+		state = base64.RawURLEncoding.EncodeToString(b)
+	}
+
+	localOAuth := *oauthConfig
+	localOAuth.ClientID = ClientID
+	localOAuth.ClientSecret = ClientSecret
+	localOAuth.Scopes = CloudScopes
+	// Use OOB redirect URI for Desktop app clients so Google displays the code on a page
+	localOAuth.RedirectURL = "urn:ietf:wg:oauth:2.0:oob"
+
+	options := []oauth2.AuthCodeOption{
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+	}
+	if sshContext := cfg.CurrentContext(); sshContext != nil && sshContext.GCloud != nil && sshContext.GCloud.Account != "" {
+		options = append(options, oauth2.SetAuthURLParam("login_hint", sshContext.GCloud.Account))
+	} else {
+		options = append(options, oauth2.SetAuthURLParam("prompt", "select_account"))
+	}
+
+	authURL := localOAuth.AuthCodeURL(state, options...)
+
+	fmt.Println("Open the following URL in your browser:")
+	fmt.Println(authURL)
+	fmt.Println()
+	fmt.Println("After authentication, copy the authorization code from the URL and paste it below.")
+	fmt.Print("Enter authorization code: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	code, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read authorization code: %w", err)
+	}
+	code = strings.TrimSpace(code)
+
+	token, err := localOAuth.Exchange(ctx, code,
+		oauth2.SetAuthURLParam("code_verifier", codeVerifier),
+		oauth2.SetAuthURLParam("client_secret", localOAuth.ClientSecret),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange authorization code: %w", err)
+	}
+
+	if err := cfg.SetToken(*token); err != nil {
+		log.Logf("Failed to persist token: %v", err)
+	}
+
+	log.Log("Authenticated...")
+
+	if token.RefreshToken == "" {
+		log.Log("Warning: no refresh token returned. You may need to re-auth with prompt=consent to get a refresh token.")
+	}
+
+	return newTokenSourceWithRefreshCheck(ctx, token, cfg, &localOAuth), nil
 }
 
 func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
@@ -148,11 +264,6 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 	log.Log("Opening browser for authentication...")
 	OpenBrowser(ctx, cfg, authURL)
 
-	// Create a channel for shutdown signaling that can carry a token or an error.
-	type authResult struct {
-		token *oauth2.Token
-		err   error
-	}
 	shutdownChan := make(chan authResult, 1)
 
 	// Use a dedicated ServeMux to avoid interfering with global handlers.
