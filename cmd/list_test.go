@@ -186,18 +186,20 @@ func Test_listRunningFilter(t *testing.T) {
 func Test_listFormatState(t *testing.T) {
 	tests := []struct {
 		state    workstationspb.Workstation_State
+		notFound bool
 		expected string
 	}{
-		{workstationspb.Workstation_STATE_RUNNING, "🟢 RUNNING"},
-		{workstationspb.Workstation_STATE_STOPPED, "🔴 STOPPED"},
-		{workstationspb.Workstation_STATE_STARTING, "🟡 STARTING"},
-		{workstationspb.Workstation_STATE_STOPPING, "🟡 STOPPING"},
-		{workstationspb.Workstation_STATE_UNSPECIFIED, "⚪ UNSPECIFIED"},
+		{workstationspb.Workstation_STATE_RUNNING, false, "🟢 RUNNING"},
+		{workstationspb.Workstation_STATE_STOPPED, false, "🔴 STOPPED"},
+		{workstationspb.Workstation_STATE_STARTING, false, "🟡 STARTING"},
+		{workstationspb.Workstation_STATE_STOPPING, false, "🟡 STOPPING"},
+		{workstationspb.Workstation_STATE_UNSPECIFIED, false, "⚪ UNSPECIFIED"},
+		{workstationspb.Workstation_STATE_UNSPECIFIED, true, "❌ NOT_FOUND"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			if got := formatState(tt.state); got != tt.expected {
+			if got := formatState(workstationState{state: tt.state, notFound: tt.notFound}); got != tt.expected {
 				t.Errorf("formatState() = %v, want %v", got, tt.expected)
 			}
 		})

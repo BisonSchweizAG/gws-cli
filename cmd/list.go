@@ -125,13 +125,14 @@ var listCmd = &cobra.Command{
 
 		rows := make([]table.Row, 0, len(workstations))
 		for _, ws := range workstations {
+			st := workstationState{state: ws.State}
 			if wide {
 				rows = append(rows, table.Row{
 					ws.Project,
 					ws.Config,
 					ws.Name,
 					ws.User,
-					formatState(ws.State),
+					formatState(st),
 					formatDate(ws.LastStarted),
 					formatDate(ws.CreatedDate),
 				})
@@ -139,7 +140,7 @@ var listCmd = &cobra.Command{
 				rows = append(rows, table.Row{
 					ws.Name,
 					ws.User,
-					formatState(ws.State),
+					formatState(st),
 					formatDate(ws.LastStarted),
 				})
 			}

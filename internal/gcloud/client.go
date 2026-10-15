@@ -13,6 +13,8 @@ import (
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/spinner"
@@ -479,6 +481,7 @@ type WorkstationState struct {
 	Config           string
 	Name             string
 	State            workstationspb.Workstation_State
+	NotFound         bool
 	Uptime           *time.Duration
 	RunningTimeout   *time.Duration
 	IdleTimeout      *time.Duration
@@ -500,12 +503,15 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter 
 		_ = cfg.UseContext(name)
 		_, _, wsc, ws, err := setup(ctx, cfg)
 		if err != nil {
+			st, ok := status.FromError(err)
+			isNotFound := ok && st.Code() == codes.NotFound
 			states = append(states, WorkstationState{
-				Context: name,
-				Project: ctxCfg.GCloud.Project,
-				Config:  ctxCfg.GCloud.Config,
-				Name:    ctxCfg.GCloud.Name,
-				State:   workstationspb.Workstation_STATE_UNSPECIFIED,
+				Context:  name,
+				Project:  ctxCfg.GCloud.Project,
+				Config:   ctxCfg.GCloud.Config,
+				Name:     ctxCfg.GCloud.Name,
+				State:    workstationspb.Workstation_STATE_UNSPECIFIED,
+				NotFound: isNotFound,
 			})
 			continue
 		}
