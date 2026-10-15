@@ -195,6 +195,14 @@ gws scripts bash-reconnect-ssh -o ./reconnect.sh
 | `-o, --output` | Output file (default: stdout)                  |
 | `-s, --save`   | Save the script to the default config location |
 
+#### `gws login`
+
+Authenticate with Google Cloud using a simple text-based flow. This command prints an authorization URL to the terminal and waits for you to paste the authorization code. It does not require a browser or TUI, making it suitable for Termux and other headless environments.
+
+```bash
+gws login
+```
+
 #### `gws logout`
 
 Log out and remove the stored Google access token.

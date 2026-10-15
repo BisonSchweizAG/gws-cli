@@ -153,11 +153,25 @@ func CodeLogin(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, erro
 	fmt.Print("Enter authorization code: ")
 
 	reader := bufio.NewReader(os.Stdin)
-	code, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("failed to read authorization code: %w", err)
+	codeChan := make(chan string, 1)
+	go func() {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			codeChan <- ""
+			return
+		}
+		codeChan <- strings.TrimSpace(line)
+	}()
+
+	var code string
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case code = <-codeChan:
+		if code == "" {
+			return nil, errors.New("failed to read authorization code")
+		}
 	}
-	code = strings.TrimSpace(code)
 
 	token, err := localOAuth.Exchange(ctx, code,
 		oauth2.SetAuthURLParam("code_verifier", codeVerifier),
