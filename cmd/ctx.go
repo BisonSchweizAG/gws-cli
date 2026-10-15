@@ -79,7 +79,7 @@ func (*ctxModel) Init() tea.Cmd {
 func (m *ctxModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msgType, ok := msg.(tea.KeyPressMsg); ok {
 		switch msgType.String() {
-		case "q":
+		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up":
 			if m.cursor > 0 {
