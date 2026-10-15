@@ -199,6 +199,23 @@ func setup(
 	return sshContext, c, wsc, ws, err
 }
 
+// GetWorkstationURL returns the default web URL for the configured workstation.
+// It fetches the workstation from the GCP API and returns its host field,
+// which is the URL used to access the workstation in a browser.
+func GetWorkstationURL(ctx context.Context, cfg *types.Config) (string, error) {
+	sshCtx, _, _, ws, err := setup(ctx, cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to get workstation: %w", err)
+	}
+
+	host := ws.GetHost()
+	if host == "" {
+		return "", fmt.Errorf("workstation %q has no host URL", sshCtx.GCloud.Name)
+	}
+
+	return host, nil
+}
+
 type Project struct {
 	ID   string
 	Name string

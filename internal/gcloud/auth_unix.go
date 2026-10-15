@@ -11,7 +11,8 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
-func openBrowser(ctx context.Context, cfg *types.Config, authURL string) {
+// OpenBrowser opens the given URL in the default browser.
+func OpenBrowser(ctx context.Context, cfg *types.Config, authURL string) {
 	var cmd *exec.Cmd
 	if IsWSL() {
 		cmd = windowsCmd(ctx, cfg, authURL)
