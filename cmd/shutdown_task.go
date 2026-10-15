@@ -11,11 +11,13 @@ var shutdownTaskCmd = &cobra.Command{
 	Short: "Manage the Windows shutdown task for stopping workstations",
 }
 
+var flagDumpXML bool
+
 var shutdownTaskRegisterCmd = &cobra.Command{
 	Use:   "register",
 	Short: "Register a Windows shutdown task to stop all workstations on shutdown",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return shutdowntask.Register()
+		return shutdowntask.Register(flagDumpXML)
 	},
 }
 
@@ -35,9 +37,19 @@ var shutdownTaskStatusCmd = &cobra.Command{
 	},
 }
 
+var shutdownTaskDumpXMLCmd = &cobra.Command{
+	Use:   "dump-xml",
+	Short: "Print the task XML template to stdout",
+	RunE: func(_ *cobra.Command, _ []string) error {
+		return shutdowntask.DumpXML()
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(shutdownTaskCmd)
 	shutdownTaskCmd.AddCommand(shutdownTaskRegisterCmd)
+	shutdownTaskRegisterCmd.Flags().BoolVar(&flagDumpXML, "dump-xml", false, "Print the rendered task XML to stderr")
 	shutdownTaskCmd.AddCommand(shutdownTaskUnregisterCmd)
 	shutdownTaskCmd.AddCommand(shutdownTaskStatusCmd)
+	shutdownTaskCmd.AddCommand(shutdownTaskDumpXMLCmd)
 }

@@ -23,7 +23,7 @@ type taskXMLData struct {
 }
 
 // registerShutdownTask creates a Windows scheduled task that runs "gws stop --all --now" on shutdown.
-func registerShutdownTask() error {
+func registerShutdownTask(dumpXML bool) error {
 	execPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve gws executable path: %w", err)
@@ -53,7 +53,12 @@ func registerShutdownTask() error {
 		Command:   execPath,
 		Arguments: "stop --all --now",
 	}
-	if err := os.WriteFile(tmpFile, mustRender(tmpl, data), 0644); err != nil {
+	renderedXML := mustRender(tmpl, data)
+	if dumpXML {
+		fmt.Fprintln(os.Stderr, string(renderedXML))
+		return nil
+	}
+	if err := os.WriteFile(tmpFile, renderedXML, 0644); err != nil {
 		return fmt.Errorf("write task XML: %w", err)
 	}
 	defer os.Remove(tmpFile)
@@ -108,5 +113,15 @@ func shutdownTaskStatus() error {
 		return nil
 	}
 	fmt.Printf("Shutdown task %s is registered.\n", shutdownTaskName)
+	return nil
+}
+
+// dumpXMLTemplate prints the raw embedded task XML template to stdout.
+func dumpXMLTemplate() error {
+	taskXML, err := taskXMLFS.ReadFile("task.xml")
+	if err != nil {
+		return fmt.Errorf("read task XML template: %w", err)
+	}
+	fmt.Println(string(taskXML))
 	return nil
 }
