@@ -4,6 +4,7 @@ import (
 	"context"
 
 	tea "charm.land/bubbletea/v2"
+	"cloud.google.com/go/workstations/apiv1/workstationspb"
 	"github.com/spf13/cobra"
 
 	"github.com/bisonschweizag/gws-cli/internal/gcloud"
@@ -22,8 +23,16 @@ var launchCmd = &cobra.Command{
 			return err
 		}
 
-		spinner.Disable()
-		m := tui.NewModel(cmd.Context(), cfg, ">_ GWS Launch", func(ctx context.Context) error {
+		ctx := cmd.Context()
+
+		// Check if the workstation is already running
+		state, err := gcloud.GetWorkstationState(ctx, cfg)
+		if err != nil {
+			return err
+		}
+
+		if state == workstationspb.Workstation_STATE_RUNNING {
+			// Already running — skip TUI, just open the URL
 			url, err := gcloud.GetWorkstationURL(ctx, cfg)
 			if err != nil {
 				return err
@@ -31,7 +40,29 @@ var launchCmd = &cobra.Command{
 
 			cfg.SendAuthURL(url)
 			log.Log(url)
+			log.Logf("Opening workstation URL: %s", url)
+			gcloud.OpenBrowser(ctx, cfg, url)
+			log.Log("Workstation URL opened in browser")
+			return nil
+		}
 
+		// Not running — start via TUI, then open URL
+		spinner.Disable()
+		m := tui.NewModel(ctx, cfg, ">_ GWS Launch", func(ctx context.Context) error {
+			// Start the workstation
+			err := gcloud.StartWorkstation(ctx, cfg, "")
+			if err != nil {
+				return err
+			}
+
+			// Get and open the URL
+			url, err := gcloud.GetWorkstationURL(ctx, cfg)
+			if err != nil {
+				return err
+			}
+
+			cfg.SendAuthURL(url)
+			log.Log(url)
 			log.Logf("Opening workstation URL: %s", url)
 			gcloud.OpenBrowser(ctx, cfg, url)
 			log.Log("Workstation URL opened in browser")

@@ -199,6 +199,15 @@ func setup(
 	return sshContext, c, wsc, ws, err
 }
 
+// GetWorkstationState returns the current state of the configured workstation.
+func GetWorkstationState(ctx context.Context, cfg *types.Config) (workstationspb.Workstation_State, error) {
+	_, _, _, ws, err := setup(ctx, cfg) //nolint:dogsled
+	if err != nil {
+		return workstationspb.Workstation_STATE_UNSPECIFIED, fmt.Errorf("failed to get workstation: %w", err)
+	}
+	return ws.GetState(), nil
+}
+
 // GetWorkstationURL returns the default web URL for the configured workstation.
 // It fetches the workstation from the GCP API and returns its host field,
 // which is the URL used to access the workstation in a browser.
