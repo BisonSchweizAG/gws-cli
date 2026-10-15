@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 	"cloud.google.com/go/workstations/apiv1/workstationspb"
@@ -11,7 +12,26 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/spinner"
 	"github.com/bisonschweizag/gws-cli/internal/tui"
+	"github.com/bisonschweizag/gws-cli/internal/types"
 )
+
+// launchPort is the port to prepend to the workstation URL (default 80).
+var launchPort int
+
+// openWorkstationURL fetches the workstation URL, logs it, and opens it in the browser.
+func openWorkstationURL(ctx context.Context, cfg *types.Config) error {
+	url, err := gcloud.GetWorkstationURL(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	url = fmt.Sprintf("https://%d-%s", launchPort, url)
+
+	log.Logf("Opening workstation URL: %s", url)
+	gcloud.OpenBrowser(ctx, cfg, url)
+	log.Log("Workstation URL opened in browser")
+	return nil
+}
 
 // launchCmd represents the launch command.
 var launchCmd = &cobra.Command{
@@ -33,40 +53,16 @@ var launchCmd = &cobra.Command{
 
 		if state == workstationspb.Workstation_STATE_RUNNING {
 			// Already running — skip TUI, just open the URL
-			url, err := gcloud.GetWorkstationURL(ctx, cfg)
-			if err != nil {
-				return err
-			}
-
-			cfg.SendAuthURL(url)
-			log.Log(url)
-			log.Logf("Opening workstation URL: %s", url)
-			gcloud.OpenBrowser(ctx, cfg, url)
-			log.Log("Workstation URL opened in browser")
-			return nil
+			return openWorkstationURL(ctx, cfg)
 		}
 
 		// Not running — start via TUI, then open URL
 		spinner.Disable()
 		m := tui.NewModel(ctx, cfg, ">_ GWS Launch", func(ctx context.Context) error {
-			// Start the workstation
-			err := gcloud.StartWorkstation(ctx, cfg, "")
-			if err != nil {
+			if err := gcloud.StartWorkstation(ctx, cfg, ""); err != nil {
 				return err
 			}
-
-			// Get and open the URL
-			url, err := gcloud.GetWorkstationURL(ctx, cfg)
-			if err != nil {
-				return err
-			}
-
-			cfg.SendAuthURL(url)
-			log.Log(url)
-			log.Logf("Opening workstation URL: %s", url)
-			gcloud.OpenBrowser(ctx, cfg, url)
-			log.Log("Workstation URL opened in browser")
-			return nil
+			return openWorkstationURL(ctx, cfg)
 		})
 		m.AutoQuit = true
 
@@ -84,4 +80,5 @@ var launchCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(launchCmd)
+	launchCmd.Flags().IntVarP(&launchPort, "port", "p", 80, "The workstation port to use")
 }
