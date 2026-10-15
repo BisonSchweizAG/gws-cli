@@ -251,7 +251,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case shutdownMsg:
 		// System is shutting down — stop all workstations
 		log.Log("🔌 System shutdown detected — stopping all workstations...")
-		_ = gcloud.StopAllWorkstations(context.Background(), m.Config)
+		_ = gcloud.StopAllWorkstationsNow(context.Background(), m.Config)
 		m.Quitting = true
 		m.cancel()
 		return m, tea.Quit

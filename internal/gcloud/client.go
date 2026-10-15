@@ -478,6 +478,22 @@ func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
 	return errors.Join(errs...)
 }
 
+func StopAllWorkstationsNow(ctx context.Context, cfg *types.Config) error {
+	var errs []error
+	currContext := cfg.CurrentContextName
+	defer func() { _ = cfg.SwitchContext(currContext, true) }()
+	for name := range cfg.Contexts {
+		if err := cfg.SwitchContext(name, true); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if err := StopWorkstationNow(ctx, cfg); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func StopWorkstation(ctx context.Context, cfg *types.Config) error {
 	sshContext, c, _, ws, err := setup(ctx, cfg)
 	if err != nil {
@@ -501,6 +517,24 @@ func StopWorkstation(ctx context.Context, cfg *types.Config) error {
 		}
 		spinny.Stop()
 		log.Logf("Workstation stopped in %s %q", time.Since(start).String(), sshContext.GCloud.Name)
+	} else {
+		log.Logf("Workstation already stopped %q", sshContext.GCloud.Name)
+	}
+	return nil
+}
+
+func StopWorkstationNow(ctx context.Context, cfg *types.Config) error {
+	sshContext, c, _, ws, err := setup(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	if ws.GetState() != workstationspb.Workstation_STATE_STOPPED {
+		if _, err := c.StopWorkstation(ctx, &workstationspb.StopWorkstationRequest{Name: ws.GetName()}); err != nil {
+			log.Logf("Error stopping workstation: %v", err)
+			return err
+		}
+		log.Logf("Stop request sent for %q", sshContext.GCloud.Name)
 	} else {
 		log.Logf("Workstation already stopped %q", sshContext.GCloud.Name)
 	}
