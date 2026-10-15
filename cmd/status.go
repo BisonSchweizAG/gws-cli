@@ -68,9 +68,10 @@ var statusCmd = &cobra.Command{
 			if s.RunningTimeout == nil || *s.RunningTimeout == 0 {
 				shutdown = ""
 			}
+			st := workstationState{state: s.State, notFound: s.NotFound}
 			if wide {
 				rows = append(rows, table.Row{
-					contextName, s.Project, s.Config, s.Name, formatState(s.State), formatUptime(s.Uptime),
+					contextName, s.Project, s.Config, s.Name, formatState(st), formatUptime(s.Uptime),
 					shutdown, formatUptime(s.RunningTimeout), formatUptime(s.IdleTimeout), formatDateTime(s.LastUpdated),
 				})
 			} else {
@@ -79,7 +80,7 @@ var statusCmd = &cobra.Command{
 					table.Row{
 						contextName,
 						s.Name,
-						formatState(s.State),
+						formatState(st),
 						formatUptime(s.Uptime),
 						shutdown,
 					},
@@ -153,11 +154,14 @@ func formatContext(name, current string) string {
 	return name
 }
 
-func formatState(s workstationspb.Workstation_State) string {
-	state := s.String()
+func formatState(s workstationState) string {
+	if s.notFound {
+		return "❌ NOT_FOUND"
+	}
+	state := s.state.String()
 	state = strings.ReplaceAll(state, "Workstation_STATE_", "")
 	state = strings.ReplaceAll(state, "STATE_", "")
-	switch s {
+	switch s.state {
 	case workstationspb.Workstation_STATE_RUNNING:
 		return "🟢 " + state
 	case workstationspb.Workstation_STATE_STOPPED:
@@ -167,6 +171,11 @@ func formatState(s workstationspb.Workstation_State) string {
 	default:
 		return "⚪ " + state
 	}
+}
+
+type workstationState struct {
+	state    workstationspb.Workstation_State
+	notFound bool
 }
 
 func formatUptime(u *time.Duration) string {
