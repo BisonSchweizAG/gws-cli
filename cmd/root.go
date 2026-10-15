@@ -18,8 +18,8 @@ var (
 		Use:     "gws",
 		Short:   "Google Cloud Workstation Utils",
 		Version: version.Version,
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
 		},
 	}
 	flagConfig  string
