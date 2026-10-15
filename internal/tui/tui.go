@@ -11,7 +11,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/atotto/clipboard"
 
+	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
+	"github.com/bisonschweizag/gws-cli/internal/shutdown"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 	"github.com/bisonschweizag/gws-cli/internal/update"
 	"github.com/bisonschweizag/gws-cli/version"
@@ -97,6 +99,7 @@ type (
 	errMsg                 struct{ err error }
 	opDoneMsg              struct{}
 	newVersionAvailableMsg struct{ latestVersion string }
+	shutdownMsg            struct{}
 )
 
 func (m *Model) Init() tea.Cmd {
@@ -111,7 +114,7 @@ func (m *Model) Init() tea.Cmd {
 		m.Config.InitAuthChannels()
 	}
 
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		func() tea.Msg {
 			err := m.Operation(m.ctx)
 			if err != nil {
@@ -123,7 +126,14 @@ func (m *Model) Init() tea.Cmd {
 		m.waitForAuthURL(),
 		m.Spinner.Tick,
 		checkForNewVersion,
-	)
+	}
+
+	// Listen for system shutdown signals if configured
+	if m.Config != nil && m.Config.TerminateOnShutdown {
+		cmds = append(cmds, m.waitForShutdown())
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // checkForNewVersion queries the GitHub releases API to see if a newer version is available.
@@ -167,6 +177,18 @@ func (m *Model) waitForAuthURL() tea.Cmd {
 			return nil
 		}
 		return authURLMsg(url)
+	}
+}
+
+// waitForShutdown listens for real system shutdown (not reboot) using platform-specific detection.
+func (*Model) waitForShutdown() tea.Cmd {
+	return func() tea.Msg {
+		err := shutdown.WaitForShutdown()
+		if err != nil {
+			// Platform not supported or restart detected - ignore
+			return nil
+		}
+		return shutdownMsg{}
 	}
 }
 
@@ -225,6 +247,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.Spinner, cmd = m.Spinner.Update(msg)
 		return m, cmd
+	case shutdownMsg:
+		// System is shutting down — stop all workstations
+		log.Log("System shutdown detected, stopping all workstations...")
+		_ = gcloud.StopAllWorkstations(context.Background(), m.Config)
+		m.Quitting = true
+		m.cancel()
+		return m, tea.Quit
 	}
 	return m, nil
 }
