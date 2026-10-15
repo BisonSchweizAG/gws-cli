@@ -386,10 +386,14 @@ mv gws $HOME/.local/bin/
 
 ### Authentication
 
-The first time you run `gws`, it will prompt you to authenticate with Google Cloud. Since Termux doesn't have a
-web browser, the auth URL will be printed to the terminal. Copy and paste this URL into your browser on any device
-to complete authentication. The authorization code will be displayed, and you can paste it back into the Termux
-session.
+Use the `gws login` command to authenticate. Since the Android browser cannot reach a local HTTP server in Termux,
+the login flow uses a manual authorization code:
+
+1. Run `gws login` — it will print an authentication URL.
+2. Open the URL in your device's browser.
+3. Sign in and grant permission.
+4. After authentication, the browser will show a URL containing an authorization code — copy the `code` parameter value.
+5. Paste the code back into the Termux session when prompted.
 
 ### DNS Resolution
 
