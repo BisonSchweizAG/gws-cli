@@ -226,6 +226,35 @@ gws update --force
 | `--check` | Only check whether a newer version is available                             |
 | `--force` | Install the latest release even if it is not newer (or this is a dev build) |
 
+#### `gws shutdown-task`
+
+Manage a Windows scheduled task that automatically stops all workstations when Windows shuts down or restarts.
+This command is **Windows-only** and requires Windows 10 or later.
+
+##### `gws shutdown-task register`
+
+Register the shutdown task. If the task is already registered, the command exits successfully.
+
+```bash
+gws shutdown-task register
+```
+
+##### `gws shutdown-task unregister`
+
+Remove the shutdown task. If the task is not registered, the command exits successfully.
+
+```bash
+gws shutdown-task unregister
+```
+
+##### `gws shutdown-task status`
+
+Check whether the shutdown task is currently registered.
+
+```bash
+gws shutdown-task status
+```
+
 ## Configuration
 
 `gws` is configured using a YAML file (default: `~/.config/gws/config.yaml`). You can use the `gws setup` command to
