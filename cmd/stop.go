@@ -26,14 +26,15 @@ var (
 				return err
 			}
 
+			if flagStopNow {
+				if flagStopAll {
+					return gcloud.StopAllWorkstationsNow(cmd.Context(), cfg)
+				}
+				return gcloud.StopWorkstationNow(cmd.Context(), cfg)
+			}
+
 			spinner.Disable()
 			m := tui.NewModel(cmd.Context(), cfg, ">_ GWS Stop", func(ctx context.Context) error {
-				if flagStopNow {
-					if flagStopAll {
-						return gcloud.StopAllWorkstationsNow(ctx, cfg)
-					}
-					return gcloud.StopWorkstationNow(ctx, cfg)
-				}
 				if flagStopAll {
 					return gcloud.StopAllWorkstations(ctx, cfg)
 				}
