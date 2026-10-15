@@ -450,6 +450,7 @@ func getWorkstationEnvVar(ws *workstationspb.Workstation, name string) string {
 
 func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
 	var errs []error
+	var stopped []string
 	currContext := cfg.CurrentContextName
 	defer func() { _ = cfg.SwitchContext(currContext, true) }()
 	for name := range cfg.Contexts {
@@ -459,7 +460,12 @@ func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
 		}
 		if err := StopWorkstation(ctx, cfg); err != nil {
 			errs = append(errs, err)
+		} else {
+			stopped = append(stopped, cfg.CurrentContextName)
 		}
+	}
+	if len(stopped) > 0 {
+		log.Logf("Stopped workstations: %s", stopped)
 	}
 	return errors.Join(errs...)
 }
