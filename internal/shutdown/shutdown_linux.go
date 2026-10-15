@@ -5,63 +5,143 @@ package shutdown
 import (
 	"errors"
 	"fmt"
+	"os"
+	"sync"
 
 	"github.com/godbus/dbus/v5"
 )
 
-// WaitForShutdown blocks until the system is shutting down (power off, not reboot).
-// It registers a delay inhibitor lock with systemd-logind, then listens for the
-// PrepareForShutdown signal via D-Bus. The inhibitor lock is required so that
-// logind actually sends the signal to this process.
-func WaitForShutdown() error {
-	conn, err := dbus.SystemBus()
+const (
+	logindDest  = "org.freedesktop.login1"
+	logindPath  = "/org/freedesktop/login1"
+	logindIface = "org.freedesktop.login1.Manager"
+)
+
+// WaitForShutdown blocks until the system is powering off (not rebooting).
+// It holds a delay inhibitor lock with systemd-logind, so the shutdown is delayed
+// (up to logind's InhibitDelayMaxSec) until the returned ReleaseFunc is called.
+func WaitForShutdown() (ReleaseFunc, error) {
+	// Use a private connection, closing the shared dbus.SystemBus() would break other users.
+	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
-		return fmt.Errorf("connect to system bus: %w", err)
+		return nil, fmt.Errorf("connect to system bus: %w", err)
 	}
-	defer conn.Close()
 
-	logind := conn.Object("org.freedesktop.login1", "/org/freedesktop/login1")
-
-	// Register a delay inhibitor lock so logind sends PrepareForShutdown to this process.
-	// Without this, the signal is not delivered on many systems (e.g. Ubuntu).
-	var fd dbus.UnixFD
-	err = logind.Call(
-		"org.freedesktop.login1.Manager.Inhibit", 0,
-		"shutdown",          // what
-		"GWS CLI",           // who
-		"Graceful shutdown", // why
-		"delay",             // mode
-	).Store(&fd)
+	release, err := waitForPowerOff(conn)
 	if err != nil {
-		return fmt.Errorf("inhibit shutdown: %w", err)
+		_ = conn.Close()
+		return nil, err
 	}
-	// Keep the fd alive for the duration of this function so the inhibitor lock
-	// remains active. When the function returns (or the conn is closed), the fd
-	// is dropped and the lock is released.
-	_ = fd
+	return sync.OnceFunc(func() {
+		release()
+		_ = conn.Close()
+	}), nil
+}
 
-	// Subscribe to PrepareForShutdown signals from systemd-logind
-	err = conn.AddMatchSignal(
-		dbus.WithMatchInterface("org.freedesktop.login1.Manager"),
+func waitForPowerOff(conn *dbus.Conn) (func(), error) {
+	logind := conn.Object(logindDest, logindPath)
+
+	err := conn.AddMatchSignal(
+		dbus.WithMatchObjectPath(logindPath),
+		dbus.WithMatchInterface(logindIface),
 		dbus.WithMatchMember("PrepareForShutdown"),
 	)
 	if err != nil {
-		return fmt.Errorf("add match signal: %w", err)
+		return nil, fmt.Errorf("add match signal: %w", err)
 	}
 
-	// Create a signal channel
-	sig := make(chan *dbus.Signal, 3)
+	sig := make(chan *dbus.Signal, 10)
 	conn.Signal(sig)
 
+	lock, err := inhibit(logind)
+	if err != nil {
+		return nil, err
+	}
+
 	for msg := range sig {
-		if msg.Name == "org.freedesktop.login1.Manager.PrepareForShutdown" {
-			// The boolean argument indicates true=preparing for shutdown, false=shutdown canceled
-			if len(msg.Body) > 0 {
-				if active, ok := msg.Body[0].(bool); ok && active {
-					return nil
+		if msg.Name != logindIface+".PrepareForShutdown" || len(msg.Body) == 0 {
+			continue
+		}
+		active, ok := msg.Body[0].(bool)
+		if !ok {
+			continue
+		}
+
+		if !active {
+			// Shutdown/reboot was canceled: make sure we hold a lock for the next one.
+			if lock == nil {
+				if lock, err = inhibit(logind); err != nil {
+					return nil, err
 				}
 			}
+			continue
+		}
+
+		if isPowerOff(shutdownType(logind)) {
+			return func() { _ = lock.Close() }, nil
+		}
+
+		// Reboot (or similar): do not delay it.
+		if lock != nil {
+			_ = lock.Close()
+			lock = nil
 		}
 	}
-	return errors.New("D-Bus connection closed")
+
+	if lock != nil {
+		_ = lock.Close()
+	}
+	return nil, errors.New("D-Bus connection closed")
+}
+
+// inhibit takes a delay inhibitor lock. The lock is held as long as the returned file is open.
+func inhibit(logind dbus.BusObject) (*os.File, error) {
+	var fd dbus.UnixFD
+	err := logind.Call(
+		logindIface+".Inhibit", 0,
+		"shutdown",                  // what
+		"GWS CLI",                   // who
+		"Stopping GWS workstations", // why
+		"delay",                     // mode
+	).Store(&fd)
+	if err != nil {
+		return nil, fmt.Errorf("inhibit shutdown: %w", err)
+	}
+	return os.NewFile(uintptr(fd), "logind-inhibitor"), nil
+}
+
+// shutdownType returns the type of the shutdown in progress ("power-off", "reboot", ...)
+// or an empty string if logind does not provide it (systemd < 255).
+func shutdownType(logind dbus.BusObject) string {
+	v, err := logind.GetProperty(logindIface + ".PreparingForShutdownWithMetadata")
+	if err != nil {
+		return ""
+	}
+	return shutdownTypeFromMetadata(v)
+}
+
+func shutdownTypeFromMetadata(v dbus.Variant) string {
+	md, ok := v.Value().(map[string]dbus.Variant)
+	if !ok {
+		return ""
+	}
+	t, ok := md["type"]
+	if !ok {
+		return ""
+	}
+	if s, ok := t.Value().(string); ok {
+		return s
+	}
+	return ""
+}
+
+// isPowerOff reports whether the shutdown type means the machine goes down.
+// An unknown type (older systemd) is treated as power-off to not leave workstations running.
+func isPowerOff(shutdownType string) bool {
+	switch shutdownType {
+	case "", "power-off", "halt":
+		return true
+	default: // reboot, soft-reboot, kexec
+		return false
+	}
 }

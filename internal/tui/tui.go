@@ -99,8 +99,11 @@ type (
 	errMsg                 struct{ err error }
 	opDoneMsg              struct{}
 	newVersionAvailableMsg struct{ latestVersion string }
-	shutdownMsg            struct{}
+	shutdownMsg            struct{ release shutdown.ReleaseFunc }
 )
+
+// shutdownStopTimeout limits the time spent stopping workstations on system shutdown.
+const shutdownStopTimeout = 10 * time.Second
 
 func (m *Model) Init() tea.Cmd {
 	log.SetLogger(func(l string) {
@@ -184,12 +187,12 @@ func (m *Model) waitForAuthURL() tea.Cmd {
 // waitForShutdown listens for real system shutdown (not reboot) using platform-specific detection.
 func (*Model) waitForShutdown() tea.Cmd {
 	return func() tea.Msg {
-		err := shutdown.WaitForShutdown()
+		release, err := shutdown.WaitForShutdown()
 		if err != nil {
-			// Platform not supported or restart detected - ignore
+			// Platform not supported or detection not available - ignore
 			return nil
 		}
-		return shutdownMsg{}
+		return shutdownMsg{release: release}
 	}
 }
 
@@ -251,7 +254,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case shutdownMsg:
 		// System is shutting down — stop all workstations
 		log.Log("🔌 System shutdown detected — stopping all workstations...")
-		_ = gcloud.StopAllWorkstationsNow(context.Background(), m.Config)
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownStopTimeout)
+		_ = gcloud.StopAllWorkstationsNow(ctx, m.Config)
+		cancel()
+		// Let the system continue shutting down.
+		msg.release()
 		m.Quitting = true
 		m.cancel()
 		return m, tea.Quit
