@@ -133,7 +133,7 @@ func (m *Model) Init() tea.Cmd {
 	}
 
 	// Set shutdown hook status based on config
-	if m.Config != nil && m.Config.TerminateOnShutdown {
+	if m.Config != nil && m.Config.StopWorkstationOnExitTunnel {
 		m.ShutdownHookActive = true
 	}
 
@@ -184,7 +184,6 @@ func (m *Model) waitForAuthURL() tea.Cmd {
 	}
 }
 
-
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
@@ -192,7 +191,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Quitting = true
 			m.cancel()
 			// Stop workstations on exit if configured
-			if m.Config != nil && m.Config.TerminateOnShutdown {
+			if m.Config != nil && m.Config.StopWorkstationOnExitTunnel {
 				log.Log("🔌 Exiting — stopping all workstations...")
 				ctx, cancel := context.WithTimeout(context.Background(), stopOnExitTimeout)
 				_ = gcloud.StopAllWorkstationsNow(ctx, m.Config)
@@ -204,8 +203,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if msg.String() == "t" && m.Config != nil {
-			m.Config.TerminateOnShutdown = !m.Config.TerminateOnShutdown
-			m.ShutdownHookActive = m.Config.TerminateOnShutdown
+			m.Config.StopWorkstationOnExitTunnel = !m.Config.StopWorkstationOnExitTunnel
+			m.ShutdownHookActive = m.Config.StopWorkstationOnExitTunnel
 			if err := m.Config.SaveConfig(); err != nil {
 				m.Logs = append(m.Logs, fmt.Sprintf("⚠ Failed to save config: %v", err))
 			}
@@ -278,7 +277,7 @@ func (m *Model) View() tea.View {
 	title := m.Styles.Title.Render(m.Title)
 	var titleRow string
 	if m.ShutdownHookActive {
-		shutdown := m.Styles.ShutdownHook.Render("⚡ Stop on exit ⚡")
+		shutdown := m.Styles.ShutdownHook.Render("⚡ Stop WS on exit ⚡")
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title, "  ", shutdown)
 	} else {
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title)

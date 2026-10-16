@@ -113,9 +113,9 @@ func TestTUI_ClipboardCopy(t *testing.T) {
 
 func TestTUIView_ShutdownHook(t *testing.T) {
 	cfg := &types.Config{
-		FilePath:              "/path/to/config.yaml",
-		CurrentContextName:    "default",
-		TerminateOnShutdown:   true,
+		FilePath:                    "/path/to/config.yaml",
+		CurrentContextName:          "default",
+		StopWorkstationOnExitTunnel: true,
 	}
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
@@ -126,7 +126,7 @@ func TestTUIView_ShutdownHook(t *testing.T) {
 	m.ShutdownHookActive = true
 
 	view := m.View()
-	if !strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+	if !strings.Contains(view.Content, "⚡ Stop WS on exit ⚡") {
 		t.Error("View missing stop on exit indicator")
 	}
 }
@@ -145,7 +145,7 @@ func TestTUIView_NoShutdownHook(t *testing.T) {
 	m.ShutdownHookActive = false
 
 	view := m.View()
-	if strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+	if strings.Contains(view.Content, "⚡ Stop WS on exit ⚡") {
 		t.Error("View should not contain stop on exit indicator when inactive")
 	}
 }
@@ -456,9 +456,9 @@ func TestUpdate_NewVersionAvailable(t *testing.T) {
 
 func TestUpdate_ShutdownToggle(t *testing.T) {
 	cfg := &types.Config{
-		FilePath:              "/path/to/config.yaml",
-		CurrentContextName:    "default",
-		TerminateOnShutdown:   false,
+		FilePath:                    "/path/to/config.yaml",
+		CurrentContextName:          "default",
+		StopWorkstationOnExitTunnel: false,
 	}
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
@@ -474,8 +474,8 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 	if !m2.ShutdownHookActive {
 		t.Error("expected ShutdownHookActive to be true after toggle")
 	}
-	if !cfg.TerminateOnShutdown {
-		t.Error("expected config TerminateOnShutdown to be true")
+	if !cfg.StopWorkstationOnExitTunnel {
+		t.Error("expected config StopWorkstationOnExitTunnel to be true")
 	}
 
 	// Press 't' again to toggle off
@@ -487,8 +487,8 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 	if m3.ShutdownHookActive {
 		t.Error("expected ShutdownHookActive to be false after second toggle")
 	}
-	if cfg.TerminateOnShutdown {
-		t.Error("expected config TerminateOnShutdown to be false")
+	if cfg.StopWorkstationOnExitTunnel {
+		t.Error("expected config StopWorkstationOnExitTunnel to be false")
 	}
 }
 
@@ -764,9 +764,9 @@ func TestTUIView_AuthURL_HelpBar(t *testing.T) {
 
 func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 	cfg := &types.Config{
-		FilePath:              "/path/to/config.yaml",
-		CurrentContextName:    "default",
-		TerminateOnShutdown:   false,
+		FilePath:                    "/path/to/config.yaml",
+		CurrentContextName:          "default",
+		StopWorkstationOnExitTunnel: false,
 	}
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
@@ -875,9 +875,9 @@ func TestShutdownHookStyle(t *testing.T) {
 // a new version is available and the stop on exit is active.
 func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 	cfg := &types.Config{
-		FilePath:              "/path/to/config.yaml",
-		CurrentContextName:    "default",
-		TerminateOnShutdown:   true,
+		FilePath:                    "/path/to/config.yaml",
+		CurrentContextName:          "default",
+		StopWorkstationOnExitTunnel: true,
 	}
 	_ = cfg.UseContext("default")
 
@@ -897,8 +897,8 @@ func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 	view := m.View()
 
 	// Verify stop on exit indicator is visible in header
-	if !strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
-		t.Error("View should contain '⚡ Stop on exit ⚡' when stop on exit is active")
+	if !strings.Contains(view.Content, "⚡ Stop WS on exit ⚡") {
+		t.Error("View should contain '⚡ Stop WS on exit ⚡' when stop on exit is active")
 	}
 
 	// Verify new version badge is visible
@@ -926,9 +926,9 @@ func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 // start inactive → toggle on → view shows indicator → toggle off → view hides indicator.
 func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 	cfg := &types.Config{
-		FilePath:              "/path/to/config.yaml",
-		CurrentContextName:    "default",
-		TerminateOnShutdown:   false,
+		FilePath:                    "/path/to/config.yaml",
+		CurrentContextName:          "default",
+		StopWorkstationOnExitTunnel: false,
 	}
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
@@ -940,7 +940,7 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 
 	// Step 1: Initially inactive — view must NOT show stop on exit badge
 	view := m.View()
-	if strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+	if strings.Contains(view.Content, "⚡ Stop WS on exit ⚡") {
 		t.Error("Step 1: view should NOT show stop on exit badge initially")
 	}
 
@@ -952,7 +952,7 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 	}
 
 	view = m.View()
-	if !strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+	if !strings.Contains(view.Content, "⚡ Stop WS on exit ⚡") {
 		t.Error("Step 2: view should show stop on exit badge after toggle on")
 	}
 
@@ -964,7 +964,7 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 	}
 
 	view = m.View()
-	if strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+	if strings.Contains(view.Content, "⚡ Stop WS on exit ⚡") {
 		t.Error("Step 3: view should NOT show stop on exit badge after toggle off")
 	}
 }
