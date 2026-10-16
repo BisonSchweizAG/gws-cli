@@ -297,7 +297,7 @@ func (m *Model) View() tea.View {
 	title := m.Styles.Title.Render(m.Title)
 	var titleRow string
 	if m.ShutdownHookActive {
-		shutdown := m.Styles.ShutdownHook.Render("⚡ Shutdown on exit")
+		shutdown := m.Styles.ShutdownHook.Render("⚡ Shutdown on exit ⚡")
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title, "  ", shutdown)
 	} else {
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title)
@@ -334,11 +334,6 @@ func (m *Model) View() tea.View {
 	}
 	for _, h := range m.Headers {
 		fmt.Fprintf(&left, "  %-13s%s\n", h.Key+":", h.Value)
-	}
-
-	// Add shutdown hook status to the header row
-	if m.ShutdownHookActive {
-		fmt.Fprintf(&left, "  Shutdown:    %s\n", m.Styles.ShutdownHook.Render("⚡ Shutdown on exit"))
 	}
 
 	logo := m.Styles.Logo.Render(strings.TrimRight(version.Logo, "\n"))
