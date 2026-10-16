@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"strconv"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
@@ -61,6 +62,13 @@ var tunnelCmd = &cobra.Command{
 
 		p := tea.NewProgram(m)
 		_, err = p.Run()
+
+		// Stop workstations on exit for contexts where the flag is set.
+		// This ensures shutdown fires on any exit path (Ctrl+C, external close, SIGTERM, kill).
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_ = gcloud.StopWorkstationsForContexts(ctx, cfg)
+		cancel()
+
 		return err
 	},
 }
