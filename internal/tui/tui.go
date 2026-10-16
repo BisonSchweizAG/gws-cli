@@ -497,23 +497,23 @@ func (m *Model) View() tea.View {
 	// Shutdown confirmation prompt overlay
 	if m.ShutdownConfirming {
 		var confirmCard strings.Builder
-		confirmCard.WriteString(m.Styles.Badge.Background(Amber).Render(" ⚠ CONFIRM SHUTDOWN "))
+		confirmCard.WriteString(m.Styles.Badge.Background(Amber).Foreground(lipgloss.Color("235")).Render(" ⚠ CONFIRM SHUTDOWN "))
 		confirmCard.WriteString("\n\n")
-		confirmCard.WriteString("Stop workstation on exit?")
+		confirmCard.WriteString(lipgloss.NewStyle().Bold(true).Render("Stop workstation on exit?"))
 		confirmCard.WriteString("\n\n")
-		fmt.Fprintf(&confirmCard, "  Auto-confirm in %d seconds...", m.ShutdownConfirmRem)
+		fmt.Fprintf(&confirmCard, "  %s", m.Styles.Help.Render(fmt.Sprintf("Auto-confirm in %d seconds...", m.ShutdownConfirmRem)))
 		confirmCard.WriteString("\n\n")
 
 		// Build Stop/Don't Stop buttons with focus highlighting
 		var stopBtn, dontStopBtn string
 		if m.ShutdownConfirmSelected == 0 {
-			// Stop is selected
-			stopBtn = m.Styles.Badge.Background(Green).Render("  Stop  ")
-			dontStopBtn = m.Styles.Help.Render(" [Don't Stop] ")
+			// Stop is selected — bold green foreground with subtle background
+			stopBtn = lipgloss.NewStyle().Bold(true).Foreground(Green).Background(lipgloss.Color("235")).Padding(0, 1).Render(" Stop ")
+			dontStopBtn = m.Styles.Help.Render(" Don't Stop ")
 		} else {
-			// Don't Stop is selected
-			stopBtn = m.Styles.Help.Render(" [Stop] ")
-			dontStopBtn = m.Styles.Badge.Background(HotPink).Render(" Don't Stop ")
+			// Don't Stop is selected — bold pink foreground with subtle background
+			stopBtn = m.Styles.Help.Render(" Stop  ")
+			dontStopBtn = lipgloss.NewStyle().Bold(true).Foreground(HotPink).Background(lipgloss.Color("235")).Padding(0, 1).Render("Don't Stop")
 		}
 		confirmCard.WriteString("  " + stopBtn + "    " + dontStopBtn)
 		confirmCard.WriteString("\n\n")
