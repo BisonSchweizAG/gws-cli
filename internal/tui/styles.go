@@ -19,26 +19,27 @@ var (
 )
 
 type Styles struct {
-	Border     lipgloss.Style
-	Title      lipgloss.Style
-	Subtitle   lipgloss.Style
-	Badge      lipgloss.Style
-	Help       lipgloss.Style
-	HelpKey    lipgloss.Style
-	HelpDesc   lipgloss.Style
-	Err        lipgloss.Style
-	ErrText    lipgloss.Style
-	Info       lipgloss.Style
-	Success    lipgloss.Style
-	Logo       lipgloss.Style
-	Card       lipgloss.Style
-	URLBox     lipgloss.Style
-	Label      lipgloss.Style
-	Value      lipgloss.Style
-	Divider    lipgloss.Style
-	LogLine    lipgloss.Style
-	StatusPill lipgloss.Style
-	SSH        lipgloss.Style
+	Border       lipgloss.Style
+	Title        lipgloss.Style
+	Subtitle     lipgloss.Style
+	Badge        lipgloss.Style
+	Help         lipgloss.Style
+	HelpKey      lipgloss.Style
+	HelpDesc     lipgloss.Style
+	Err          lipgloss.Style
+	ErrText      lipgloss.Style
+	Info         lipgloss.Style
+	Success      lipgloss.Style
+	Logo         lipgloss.Style
+	Card         lipgloss.Style
+	URLBox       lipgloss.Style
+	Label        lipgloss.Style
+	Value        lipgloss.Style
+	Divider      lipgloss.Style
+	LogLine      lipgloss.Style
+	StatusPill   lipgloss.Style
+	SSH          lipgloss.Style
+	ShutdownHook lipgloss.Style
 }
 
 func DefaultStyles() *Styles {
@@ -102,6 +103,13 @@ func DefaultStyles() *Styles {
 		Padding(0, 1)
 	s.SSH = lipgloss.NewStyle().
 		Foreground(Amber)
+	s.ShutdownHook = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("235")).
+		Background(Amber).
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(Amber)
 	return s
 }
 

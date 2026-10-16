@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
@@ -59,8 +63,28 @@ var tunnelCmd = &cobra.Command{
 		}
 		m.AddHeader("SSH Port", m.Styles.SSH.Render(strconv.Itoa(port)))
 
+		// Enable shutdown hook toggle (only for tunnel command)
+		m.ShutdownHookEnabled = true
+
+		// Listen for SIGHUP (terminal close) so shutdown runs when the terminal is closed.
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGHUP)
 		p := tea.NewProgram(m)
+		go func() {
+			<-sigCh
+			p.Send(tea.QuitMsg{})
+		}()
+
 		_, err = p.Run()
+
+		// Stop workstations on exit only if shutdown is still active.
+		// If the user selected "Don't Stop" in the confirmation prompt, ShutdownHookActive is false.
+		if m.ShutdownHookActive {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			_ = gcloud.StopWorkstationsForContexts(ctx, cfg)
+			cancel()
+		}
+
 		return err
 	},
 }

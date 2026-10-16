@@ -48,7 +48,12 @@ Start the workstation for the given or current context.
 ```bash
 gws start
 gws start my-workstation
+gws start --boost my-boost-config
 ```
+
+| Flag      | Description                    |
+|-----------|--------------------------------|
+| `--boost` | The boost config to run        |
 
 #### `gws stop [context]`
 
@@ -71,7 +76,12 @@ Restart the workstation for the given or current context.
 ```bash
 gws restart
 gws restart my-workstation
+gws restart --boost my-boost-config
 ```
+
+| Flag      | Description                    |
+|-----------|--------------------------------|
+| `--boost` | The boost config to run        |
 
 #### `gws status`
 
@@ -116,6 +126,7 @@ gws tunnel
 gws tunnel my-workstation
 gws tunnel -p 2222
 gws tunnel --restart
+gws tunnel --boost my-boost-config
 ```
 
 | Flag                    | Description                                                       |
@@ -123,6 +134,7 @@ gws tunnel --restart
 | `-p, --local-host-port` | The local host port to open (default is the port from the config) |
 | `--check-token`         | Enable periodic token check (default: `true`)                     |
 | `--restart`             | Restart the workstation before opening the tunnel                 |
+| `--boost`               | The boost config to run                                           |
 
 #### `gws launch [context]`
 
@@ -131,7 +143,12 @@ Open the default web URL of the cloud workstation in your browser.
 ```bash
 gws launch
 gws launch my-workstation
+gws launch -p 8080
 ```
+
+| Flag         | Description                                 |
+|--------------|---------------------------------------------|
+| `-p, --port` | The workstation port to use (default: `80`) |
 
 #### `gws up`
 
@@ -300,6 +317,7 @@ jetbrainsGateway:
             - `path`: The path of the remote file.
             - `permissions`: The permissions of the remote file.
             - `direction`: The direction (up / down) the file is copied.
+        - `stopWorkstationOnExitTunnel`: If set to `true`, stops the cloud workstation when the SSH tunnel exits.
 - `sshTimeoutSeconds`: Optional SSH connection timeout in seconds (default: `30`).
 - `startTimeoutSeconds`: Optional workstation start timeout in seconds (default: `300`).
 - `chromeBrowser`: Optional Chrome browser configuration.

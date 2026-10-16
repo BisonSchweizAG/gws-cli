@@ -578,6 +578,48 @@ func Test_ListProjectWorkstations(t *testing.T) {
 	}
 }
 
+func Test_StopWorkstationsForContexts_flag_disabled(t *testing.T) {
+	cfg := &types.Config{
+		CurrentContextName: "test-ctx",
+		Contexts: map[string]*types.Context{
+			"test-ctx": {
+				StopWorkstationOnExitTunnel: false,
+				GCloud: &types.GCloud{
+					Project: "test-project",
+					Region:  "us-central1",
+					Cluster: "test-cluster",
+					Config:  "test-config",
+					Name:    "ws-1",
+				},
+			},
+		},
+	}
+	_ = cfg.UseContext("test-ctx")
+
+	// Should return nil without making any API calls when flag is false
+	err := StopWorkstationsForContexts(context.Background(), cfg)
+	if err != nil {
+		t.Errorf("expected nil error when flag is disabled, got: %v", err)
+	}
+}
+
+func Test_StopWorkstationsForContexts_nil_context(t *testing.T) {
+	cfg := &types.Config{
+		CurrentContextName: "nonexistent",
+		Contexts: map[string]*types.Context{
+			"test-ctx": {
+				StopWorkstationOnExitTunnel: true,
+			},
+		},
+	}
+
+	// Should return nil when current context is nil
+	err := StopWorkstationsForContexts(context.Background(), cfg)
+	if err != nil {
+		t.Errorf("expected nil error when context is nil, got: %v", err)
+	}
+}
+
 func Test_ListProjectWorkstations_empty(t *testing.T) {
 	mockSrv := &listMockServer{
 		configs: []*workstationspb.WorkstationConfig{},

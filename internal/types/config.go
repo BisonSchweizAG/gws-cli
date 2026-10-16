@@ -282,6 +282,11 @@ func (c *Config) save() error {
 	return os.WriteFile(c.FilePath, data, 0o600)
 }
 
+// SaveConfig writes the current config to disk.
+func (c *Config) SaveConfig() error {
+	return c.save()
+}
+
 func (c *Config) SetToken(token oauth2.Token) error {
 	if c == nil {
 		return nil
