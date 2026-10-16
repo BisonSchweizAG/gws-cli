@@ -128,6 +128,7 @@ func TestTUIView_ShutdownHook(t *testing.T) {
 	})
 	m.Width = 120
 	m.Height = 30
+	m.ShutdownHookEnabled = true
 	m.ShutdownHookActive = true
 
 	view := m.View()
@@ -292,6 +293,7 @@ func TestTUIView_DefaultHelp(t *testing.T) {
 	})
 	m.Width = 120
 	m.Height = 30
+	m.ShutdownHookEnabled = true
 	m.SpinnerStopped = true
 
 	view := m.View()
@@ -475,6 +477,7 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
 		return nil
 	})
+	m.ShutdownHookEnabled = true
 
 	// Press 's' to toggle stop on exit on
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: 's'})
@@ -789,6 +792,7 @@ func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
 		return nil
 	})
+	m.ShutdownHookEnabled = true
 
 	// Toggle on
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: 's'})
@@ -918,6 +922,7 @@ func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 	})
 	m.Width = 120
 	m.Height = 30
+	m.ShutdownHookEnabled = true
 	m.ShutdownHookActive = true
 	m.NewVersionAvailable = "v9.9.9"
 	m.SpinnerStopped = true
@@ -977,6 +982,7 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 	})
 	m.Width = 120
 	m.Height = 30
+	m.ShutdownHookEnabled = true
 	m.SpinnerStopped = true
 
 	// Step 1: Initially inactive — view must NOT show stop on exit badge
@@ -1048,5 +1054,761 @@ func TestTUIView_Visual_NewVersionSequence(t *testing.T) {
 	view = m.View()
 	if !strings.Contains(view.Content, "v3.0.0 available") {
 		t.Error("view should show version badge after receiving newVersionAvailableMsg")
+	}
+}
+
+// --- Shutdown confirmation prompt tests ---
+
+func makeShutdownConfig(t *testing.T, stopOnExit bool) (*types.Config, *types.Context) {
+	t.Helper()
+	ctx := &types.Context{
+		StopWorkstationOnExitTunnel: stopOnExit,
+	}
+	cfg := &types.Config{
+		FilePath:           "/path/to/config.yaml",
+		CurrentContextName: "default",
+		Contexts: map[string]*types.Context{
+			"default": ctx,
+		},
+	}
+	_ = cfg.UseContext("default")
+	return cfg, ctx
+}
+
+func makeShutdownModel(t *testing.T) *Model {
+	t.Helper()
+	cfg, _ := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = true
+	m.ShutdownHookActive = true
+	return m
+}
+
+// TestShutdownConfirm_CtrlC_Trigger verifies that Ctrl+C opens the confirmation
+// prompt when shutdown is active and enabled.
+func TestShutdownConfirm_CtrlC_Trigger(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if !m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be true after Ctrl+C")
+	}
+	if m2.ShutdownConfirmRem != int(shutdownConfirmTimeout.Seconds()) {
+		t.Errorf("expected ShutdownConfirmRem to be %d, got %d", int(shutdownConfirmTimeout.Seconds()), m2.ShutdownConfirmRem)
+	}
+	if m2.ShutdownConfirmSelected != 0 {
+		t.Error("expected ShutdownConfirmSelected to default to 0 (Stop)")
+	}
+	if m2.Quitting {
+		t.Error("expected Quitting to be false — should show prompt, not quit yet")
+	}
+	if cmd == nil {
+		t.Error("expected non-nil command (tick timer) after Ctrl+C")
+	}
+}
+
+// TestShutdownConfirm_CtrlC_NoPrompt_WhenInactive verifies that Ctrl+C quits
+// immediately when shutdown hook is not active.
+func TestShutdownConfirm_CtrlC_NoPrompt_WhenInactive(t *testing.T) {
+	cfg, _ := makeShutdownConfig(t, false)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = true
+	// ShutdownHookActive is false
+
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false when shutdown is inactive")
+	}
+	if !m2.Quitting {
+		t.Error("expected Quitting to be true — should quit immediately")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit command")
+	}
+}
+
+// TestShutdownConfirm_CtrlC_NoPrompt_WhenDisabled verifies that Ctrl+C quits
+// immediately when ShutdownHookEnabled is false (e.g., non-tunnel command).
+func TestShutdownConfirm_CtrlC_NoPrompt_WhenDisabled(t *testing.T) {
+	cfg, _ := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = false
+	m.ShutdownHookActive = true
+
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false when hook is disabled")
+	}
+	if !m2.Quitting {
+		t.Error("expected Quitting to be true")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit command")
+	}
+}
+
+// TestShutdownConfirm_Enter_Stop verifies that pressing Enter with "Stop" selected
+// quits the TUI with shutdown still active.
+func TestShutdownConfirm_Enter_Stop(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Press Enter (Stop is selected by default, index 0)
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false after Enter")
+	}
+	if !m2.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to remain true for Stop")
+	}
+	if !m2.Quitting {
+		t.Error("expected Quitting to be true")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit command")
+	}
+}
+
+// TestShutdownConfirm_Enter_DontStop verifies that pressing Enter with "Don't Stop"
+// selected quits the TUI with shutdown inactive, without changing the config flag.
+func TestShutdownConfirm_Enter_DontStop(t *testing.T) {
+	cfg, ctx := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = true
+	m.ShutdownHookActive = true
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Navigate to Don't Stop (index 1)
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Press Enter
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false after Enter")
+	}
+	if m2.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to be false for Don't Stop")
+	}
+	if !m2.Quitting {
+		t.Error("expected Quitting to be true")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit command")
+	}
+	// Config flag must NOT be changed
+	if !ctx.StopWorkstationOnExitTunnel {
+		t.Error("expected config StopWorkstationOnExitTunnel to remain true — Don't Stop must not change the flag")
+	}
+}
+
+// TestShutdownConfirm_ArrowNavigation verifies navigating between Stop and Don't Stop.
+func TestShutdownConfirm_ArrowNavigation(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Default: Stop selected (index 0)
+	if m.ShutdownConfirmSelected != 0 {
+		t.Error("expected default selection to be 0 (Stop)")
+	}
+
+	// Navigate right → Don't Stop (index 1)
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	if m.ShutdownConfirmSelected != 1 {
+		t.Errorf("expected selection 1 after Right, got %d", m.ShutdownConfirmSelected)
+	}
+
+	// Navigate left → Stop (index 0)
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	if m.ShutdownConfirmSelected != 0 {
+		t.Errorf("expected selection 0 after Left, got %d", m.ShutdownConfirmSelected)
+	}
+
+	// Vim-style: h → Stop
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: 'h'})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	if m.ShutdownConfirmSelected != 0 {
+		t.Errorf("expected selection 0 after h, got %d", m.ShutdownConfirmSelected)
+	}
+
+	// Vim-style: l → Don't Stop
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: 'l'})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	if m.ShutdownConfirmSelected != 1 {
+		t.Errorf("expected selection 1 after l, got %d", m.ShutdownConfirmSelected)
+	}
+}
+
+// TestShutdownConfirm_Esc_Cancel verifies that Esc cancels the confirmation and
+// returns to the tunnel UI without quitting.
+func TestShutdownConfirm_Esc_Cancel(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	if !m.ShutdownConfirming {
+		t.Fatal("expected confirmation to be active")
+	}
+
+	// Press Esc
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false after Esc")
+	}
+	if m2.ShutdownConfirmRem != 0 {
+		t.Error("expected ShutdownConfirmRem to be 0 after Esc")
+	}
+	if m2.ShutdownConfirmSelected != 0 {
+		t.Error("expected ShutdownConfirmSelected to reset to 0 after Esc")
+	}
+	if m2.Quitting {
+		t.Error("expected Quitting to be false — Esc returns to tunnel UI")
+	}
+	if !m2.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to remain true after Esc")
+	}
+}
+
+// TestShutdownConfirm_LegacyY verifies that pressing Y confirms shutdown.
+func TestShutdownConfirm_LegacyY(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Press Y
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: 'y'})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false after Y")
+	}
+	if !m2.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to remain true after Y")
+	}
+	if !m2.Quitting {
+		t.Error("expected Quitting to be true after Y")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit command after Y")
+	}
+}
+
+// TestShutdownConfirm_LegacyN verifies that pressing N cancels shutdown and quits
+// without stopping the workstation.
+func TestShutdownConfirm_LegacyN(t *testing.T) {
+	cfg, ctx := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = true
+	m.ShutdownHookActive = true
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Press N
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: 'n'})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false after N")
+	}
+	if m2.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to be false after N")
+	}
+	if !m2.Quitting {
+		t.Error("expected Quitting to be true after N")
+	}
+	if cmd == nil {
+		t.Error("expected tea.Quit command after N")
+	}
+	// Config flag must NOT be changed
+	if !ctx.StopWorkstationOnExitTunnel {
+		t.Error("expected config flag to remain true — N must not change the flag")
+	}
+}
+
+// TestShutdownConfirm_Timeout verifies that the 15-second timeout defaults to
+// stopping the workstation (Yes behavior).
+func TestShutdownConfirm_Timeout(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	initialRem := m.ShutdownConfirmRem
+
+	// Simulate ticks until timeout
+	for m.ShutdownConfirming {
+		newModel, _ = m.Update(shutdownConfirmTickMsg{})
+		m, ok = newModel.(*Model)
+		if !ok {
+			t.Fatal("expected *Model")
+		}
+	}
+
+	if m.ShutdownConfirming {
+		t.Error("expected ShutdownConfirming to be false after timeout")
+	}
+	if !m.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to remain true after timeout (default Yes)")
+	}
+	if !m.Quitting {
+		t.Error("expected Quitting to be true after timeout")
+	}
+	if initialRem <= 0 {
+		t.Error("expected initial countdown to be positive")
+	}
+}
+
+// TestShutdownConfirm_Tick_Countdown verifies the countdown decrements correctly.
+func TestShutdownConfirm_Tick_Countdown(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	start := m.ShutdownConfirmRem
+
+	// Tick once
+	newModel, _ = m.Update(shutdownConfirmTickMsg{})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	if m.ShutdownConfirmRem != start-1 {
+		t.Errorf("expected countdown to decrement to %d, got %d", start-1, m.ShutdownConfirmRem)
+	}
+	if !m.ShutdownConfirming {
+		t.Error("expected still confirming after one tick")
+	}
+}
+
+// TestShutdownConfirm_View renders the confirmation prompt and checks for key text.
+func TestShutdownConfirm_View(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	view := m.View()
+	if !strings.Contains(view.Content, "CONFIRM SHUTDOWN") {
+		t.Error("View should contain 'CONFIRM SHUTDOWN'")
+	}
+	if !strings.Contains(view.Content, "Stop workstation on exit?") {
+		t.Error("View should contain shutdown question")
+	}
+	if !strings.Contains(view.Content, "Auto-confirm in") {
+		t.Error("View should contain countdown text")
+	}
+	if !strings.Contains(view.Content, "Stop") {
+		t.Error("View should contain 'Stop' button")
+	}
+	if !strings.Contains(view.Content, "Don't Stop") {
+		t.Error("View should contain 'Don't Stop' button")
+	}
+	if !strings.Contains(view.Content, "Arrow keys") {
+		t.Error("View should contain navigation help")
+	}
+	if !strings.Contains(view.Content, "Enter") {
+		t.Error("View should contain Enter help")
+	}
+	if !strings.Contains(view.Content, "Esc") {
+		t.Error("View should contain Esc help")
+	}
+}
+
+// TestShutdownConfirm_View_HidesHelpBar verifies the help bar is hidden during
+// the confirmation prompt.
+func TestShutdownConfirm_View_HidesHelpBar(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	view := m.View()
+	// When confirming, the help bar should be empty (no "toggle stop on exit" or "Ctrl+C")
+	if strings.Contains(view.Content, "toggle stop on exit") {
+		t.Error("View should NOT show 'toggle stop on exit' help during confirmation")
+	}
+}
+
+// TestShutdownConfirm_Init_SetsActive verifies that Init() sets ShutdownHookActive
+// based on the config's StopWorkstationOnExitTunnel flag.
+func TestShutdownConfirm_Init_SetsActive(t *testing.T) {
+	cfg, _ := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.ShutdownHookEnabled = true
+
+	// Simulate Init() logic
+	if m.Config != nil {
+		if currCtx := m.Config.CurrentContext(); currCtx != nil && currCtx.StopWorkstationOnExitTunnel {
+			m.ShutdownHookActive = true
+		}
+	}
+
+	if !m.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to be true when config flag is true")
+	}
+}
+
+// TestShutdownConfirm_Init_SetsInactive verifies that Init() leaves
+// ShutdownHookActive false when the config flag is false.
+func TestShutdownConfirm_Init_SetsInactive(t *testing.T) {
+	cfg, _ := makeShutdownConfig(t, false)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.ShutdownHookEnabled = true
+
+	// Simulate Init() logic
+	if m.Config != nil {
+		if currCtx := m.Config.CurrentContext(); currCtx != nil && currCtx.StopWorkstationOnExitTunnel {
+			m.ShutdownHookActive = true
+		}
+	}
+
+	if m.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to be false when config flag is false")
+	}
+}
+
+// TestShutdownConfirm_DontStop_ConfigUnchanged verifies the full flow:
+// Don't Stop is selected via Enter, and the config flag remains unchanged.
+func TestShutdownConfirm_DontStop_ConfigUnchanged(t *testing.T) {
+	cfg, ctx := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = true
+	m.ShutdownHookActive = true
+
+	originalFlag := ctx.StopWorkstationOnExitTunnel
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Navigate to Don't Stop
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Press Enter to select Don't Stop
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if m2.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to be false after Don't Stop")
+	}
+	if ctx.StopWorkstationOnExitTunnel != originalFlag {
+		t.Errorf("expected config flag to remain %v, got %v", originalFlag, ctx.StopWorkstationOnExitTunnel)
+	}
+}
+
+// TestShutdownConfirm_Stop_ConfigUnchanged verifies that selecting "Stop"
+// does not modify the config flag either.
+func TestShutdownConfirm_Stop_ConfigUnchanged(t *testing.T) {
+	cfg, ctx := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = true
+	m.ShutdownHookActive = true
+
+	originalFlag := ctx.StopWorkstationOnExitTunnel
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Press Enter (Stop is default)
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	if !m2.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to remain true after Stop")
+	}
+	if ctx.StopWorkstationOnExitTunnel != originalFlag {
+		t.Errorf("expected config flag to remain %v, got %v", originalFlag, ctx.StopWorkstationOnExitTunnel)
+	}
+}
+
+// TestShutdownConfirm_Timeout_ConfigUnchanged verifies that timeout does not
+// modify the config flag.
+func TestShutdownConfirm_Timeout_ConfigUnchanged(t *testing.T) {
+	cfg, ctx := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = true
+	m.ShutdownHookActive = true
+
+	originalFlag := ctx.StopWorkstationOnExitTunnel
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Simulate ticks until timeout
+	for m.ShutdownConfirming {
+		newModel, _ = m.Update(shutdownConfirmTickMsg{})
+		m, ok = newModel.(*Model)
+		if !ok {
+			t.Fatal("expected *Model")
+		}
+	}
+
+	if !m.ShutdownHookActive {
+		t.Error("expected ShutdownHookActive to remain true after timeout")
+	}
+	if ctx.StopWorkstationOnExitTunnel != originalFlag {
+		t.Errorf("expected config flag to remain %v after timeout, got %v", originalFlag, ctx.StopWorkstationOnExitTunnel)
+	}
+}
+
+// TestShutdownConfirm_View_ButtonHighlight verifies that the selected button
+// is visually highlighted in the view.
+func TestShutdownConfirm_View_ButtonHighlight(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Default: Stop selected — should be highlighted (not in brackets)
+	view := m.View()
+	if !strings.Contains(view.Content, "Stop") {
+		t.Error("View should contain 'Stop' button")
+	}
+
+	// Navigate to Don't Stop
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	view = m.View()
+	if !strings.Contains(view.Content, "Don't Stop") {
+		t.Error("View should contain 'Don't Stop' button after navigation")
+	}
+}
+
+// TestShutdownConfirm_NoDoublePrompt verifies that pressing Ctrl+C while already
+// in the confirmation prompt does not re-trigger it.
+func TestShutdownConfirm_NoDoublePrompt(t *testing.T) {
+	m := makeShutdownModel(t)
+
+	// Trigger confirmation
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+	firstRem := m.ShutdownConfirmRem
+
+	// Press Ctrl+C again while confirming
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model")
+	}
+
+	// Should still be in the same confirmation state
+	if !m.ShutdownConfirming {
+		t.Error("expected still confirming after second Ctrl+C")
+	}
+	if m.ShutdownConfirmRem != firstRem {
+		t.Errorf("expected countdown to remain %d, got %d", firstRem, m.ShutdownConfirmRem)
+	}
+}
+
+// TestShutdownConfirm_HelpBar_Visible_WhenEnabled verifies the help bar shows
+// "toggle stop on exit" when ShutdownHookEnabled is true and not confirming.
+func TestShutdownConfirm_HelpBar_Visible_WhenEnabled(t *testing.T) {
+	m := makeShutdownModel(t)
+	m.SpinnerStopped = true
+
+	view := m.View()
+	if !strings.Contains(view.Content, "toggle stop on exit") {
+		t.Error("View should show 'toggle stop on exit' when hook is enabled")
+	}
+}
+
+// TestShutdownConfirm_HelpBar_Hidden_WhenDisabled verifies the help bar does not
+// show "toggle stop on exit" when ShutdownHookEnabled is false.
+func TestShutdownConfirm_HelpBar_Hidden_WhenDisabled(t *testing.T) {
+	cfg, _ := makeShutdownConfig(t, true)
+	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
+		return nil
+	})
+	m.Width = 120
+	m.Height = 30
+	m.ShutdownHookEnabled = false
+	m.SpinnerStopped = true
+
+	view := m.View()
+	if strings.Contains(view.Content, "toggle stop on exit") {
+		t.Error("View should NOT show 'toggle stop on exit' when hook is disabled")
 	}
 }

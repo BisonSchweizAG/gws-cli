@@ -51,9 +51,9 @@ type Model struct {
 	ShutdownHookActive  bool
 
 	// Shutdown confirmation prompt
-	ShutdownConfirming     bool
-	ShutdownConfirmRem     int  // remaining seconds
-	ShutdownConfirmSelected int  // 0=Yes (default), 1=No
+	ShutdownConfirming      bool
+	ShutdownConfirmRem      int // remaining seconds
+	ShutdownConfirmSelected int // 0=Yes (default), 1=No
 
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
@@ -226,19 +226,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Enter — trigger the selected button
 			if msg.String() == "enter" {
 				if m.ShutdownConfirmSelected == 0 {
-					// Yes — stop workstation and exit TUI
+					// Stop — stop workstation and exit TUI
 					m.ShutdownConfirming = false
-					m.Quitting = true
-					m.cancel()
-					return m, tea.Quit
- 			} else {
-					// Don't Stop — exit TUI without stopping the workstation this time
-					m.ShutdownConfirming = false
-					m.ShutdownHookActive = false
 					m.Quitting = true
 					m.cancel()
 					return m, tea.Quit
 				}
+				// Don't Stop — exit TUI without stopping the workstation this time
+				m.ShutdownConfirming = false
+				m.ShutdownHookActive = false
+				m.Quitting = true
+				m.cancel()
+				return m, tea.Quit
 			}
 			// Legacy Y/N key support
 			if msg.String() == "y" || msg.String() == "Y" {
