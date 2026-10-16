@@ -2,6 +2,7 @@ package gcloud
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
@@ -54,7 +55,9 @@ func TestLogin_Browser_AuthURL(t *testing.T) {
 	}
 
 	cancel()
-	<-errChan
+	if err := <-errChan; err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatalf("Login returned unexpected error: %v", err)
+	}
 
 	parsedURL, err := url.Parse(generatedURL)
 	if err != nil {
