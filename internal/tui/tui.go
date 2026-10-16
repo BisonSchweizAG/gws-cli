@@ -13,7 +13,6 @@ import (
 
 	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
-	"github.com/bisonschweizag/gws-cli/internal/shutdown"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 	"github.com/bisonschweizag/gws-cli/internal/update"
 	"github.com/bisonschweizag/gws-cli/version"
@@ -102,11 +101,10 @@ type (
 	errMsg                 struct{ err error }
 	opDoneMsg              struct{}
 	newVersionAvailableMsg struct{ latestVersion string }
-	shutdownMsg            struct{ release shutdown.ReleaseFunc }
 )
 
-// shutdownStopTimeout limits the time spent stopping workstations on system shutdown.
-const shutdownStopTimeout = 10 * time.Second
+// stopOnExitTimeout limits the time spent stopping workstations when exiting.
+const stopOnExitTimeout = 10 * time.Second
 
 func (m *Model) Init() tea.Cmd {
 	log.SetLogger(func(l string) {
@@ -134,10 +132,9 @@ func (m *Model) Init() tea.Cmd {
 		checkForNewVersion,
 	}
 
-	// Listen for system shutdown signals if configured
+	// Set shutdown hook status based on config
 	if m.Config != nil && m.Config.TerminateOnShutdown {
 		m.ShutdownHookActive = true
-		cmds = append(cmds, m.waitForShutdown())
 	}
 
 	return tea.Batch(cmds...)
@@ -187,17 +184,6 @@ func (m *Model) waitForAuthURL() tea.Cmd {
 	}
 }
 
-// waitForShutdown listens for real system shutdown (not reboot) using platform-specific detection.
-func (*Model) waitForShutdown() tea.Cmd {
-	return func() tea.Msg {
-		release, err := shutdown.WaitForShutdown()
-		if err != nil {
-			// Platform not supported or detection not available - ignore
-			return nil
-		}
-		return shutdownMsg{release: release}
-	}
-}
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -205,6 +191,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			m.Quitting = true
 			m.cancel()
+			// Stop workstations on exit if configured
+			if m.Config != nil && m.Config.TerminateOnShutdown {
+				log.Log("🔌 Exiting — stopping all workstations...")
+				ctx, cancel := context.WithTimeout(context.Background(), stopOnExitTimeout)
+				_ = gcloud.StopAllWorkstationsNow(ctx, m.Config)
+				cancel()
+			}
 			return m, tea.Quit
 		}
 		if m.Done {
@@ -217,11 +210,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Logs = append(m.Logs, fmt.Sprintf("⚠ Failed to save config: %v", err))
 			}
 			if m.ShutdownHookActive {
-				m.Logs = append(m.Logs, "⚠ Shutdown hook enabled — workstations will stop on system shutdown")
-				cmds := []tea.Cmd{m.waitForShutdown(), m.waitForLog()}
-				return m, tea.Batch(cmds...)
+				m.Logs = append(m.Logs, "⚠ Stop on exit enabled — workstations will stop when tunnel exits")
+			} else {
+				m.Logs = append(m.Logs, "✓ Stop on exit disabled")
 			}
-			m.Logs = append(m.Logs, "✓ Shutdown hook disabled")
 			cmd := m.waitForLog()
 			return m, cmd
 		}
@@ -269,17 +261,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.Spinner, cmd = m.Spinner.Update(msg)
 		return m, cmd
-	case shutdownMsg:
-		// System is shutting down — stop all workstations
-		log.Log("🔌 System shutdown detected — stopping all workstations...")
-		ctx, cancel := context.WithTimeout(context.Background(), shutdownStopTimeout)
-		_ = gcloud.StopAllWorkstationsNow(ctx, m.Config)
-		cancel()
-		// Let the system continue shutting down.
-		msg.release()
-		m.Quitting = true
-		m.cancel()
-		return m, tea.Quit
 	}
 	return m, nil
 }
@@ -297,7 +278,7 @@ func (m *Model) View() tea.View {
 	title := m.Styles.Title.Render(m.Title)
 	var titleRow string
 	if m.ShutdownHookActive {
-		shutdown := m.Styles.ShutdownHook.Render("⚡ Shutdown on exit ⚡")
+		shutdown := m.Styles.ShutdownHook.Render("⚡ Stop on exit ⚡")
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title, "  ", shutdown)
 	} else {
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title)
@@ -443,7 +424,7 @@ func (m *Model) View() tea.View {
 		help = m.Styles.RenderHelpBar([2]string{"Any key", "quit"})
 	default:
 		help = m.Styles.RenderHelpBar(
-			[2]string{"t", "toggle shutdown hook"},
+			[2]string{"t", "toggle stop on exit"},
 			[2]string{"Ctrl+C", "quit"},
 		)
 	}

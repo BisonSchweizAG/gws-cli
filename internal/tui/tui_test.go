@@ -126,8 +126,8 @@ func TestTUIView_ShutdownHook(t *testing.T) {
 	m.ShutdownHookActive = true
 
 	view := m.View()
-	if !strings.Contains(view.Content, "Shutdown on exit") {
-		t.Error("View missing shutdown hook indicator")
+	if !strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+		t.Error("View missing stop on exit indicator")
 	}
 }
 
@@ -145,8 +145,8 @@ func TestTUIView_NoShutdownHook(t *testing.T) {
 	m.ShutdownHookActive = false
 
 	view := m.View()
-	if strings.Contains(view.Content, "Shutdown on exit") {
-		t.Error("View should not contain shutdown hook indicator when inactive")
+	if strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+		t.Error("View should not contain stop on exit indicator when inactive")
 	}
 }
 
@@ -290,8 +290,8 @@ func TestTUIView_DefaultHelp(t *testing.T) {
 	m.SpinnerStopped = true
 
 	view := m.View()
-	if !strings.Contains(view.Content, "toggle shutdown hook") {
-		t.Error("View should show shutdown hook toggle help by default")
+	if !strings.Contains(view.Content, "toggle stop on exit") {
+		t.Error("View should show stop on exit toggle help by default")
 	}
 	if !strings.Contains(view.Content, "Ctrl+C") {
 		t.Error("View should show Ctrl+C help")
@@ -465,7 +465,7 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 		return nil
 	})
 
-	// Press 't' to toggle shutdown hook on
+	// Press 't' to toggle stop on exit on
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: 't'})
 	m2, ok := newModel.(*Model)
 	if !ok {
@@ -779,13 +779,13 @@ func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 
 	found := false
 	for _, log := range m2.Logs {
-		if strings.Contains(log, "Shutdown hook enabled") {
+		if strings.Contains(log, "Stop on exit enabled") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected log message about shutdown hook being enabled")
+		t.Error("expected log message about stop on exit being enabled")
 	}
 
 	// Toggle off
@@ -794,13 +794,13 @@ func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 
 	found = false
 	for _, log := range m3.Logs {
-		if strings.Contains(log, "Shutdown hook disabled") {
+		if strings.Contains(log, "Stop on exit disabled") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected log message about shutdown hook being disabled")
+		t.Error("expected log message about stop on exit being disabled")
 	}
 }
 
@@ -872,7 +872,7 @@ func TestShutdownHookStyle(t *testing.T) {
 }
 
 // TestTUIView_Visual_UpdateAndShutdownHook verifies the rendered view when both
-// a new version is available and the shutdown hook is active.
+// a new version is available and the stop on exit is active.
 func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 	cfg := &types.Config{
 		FilePath:              "/path/to/config.yaml",
@@ -896,9 +896,9 @@ func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 
 	view := m.View()
 
-	// Verify shutdown hook indicator is visible in header
-	if !strings.Contains(view.Content, "Shutdown on exit") {
-		t.Error("View should contain 'Shutdown on exit' when shutdown hook is active")
+	// Verify stop on exit indicator is visible in header
+	if !strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+		t.Error("View should contain '⚡ Stop on exit ⚡' when stop on exit is active")
 	}
 
 	// Verify new version badge is visible
@@ -914,9 +914,9 @@ func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 		t.Error("View should contain Context line")
 	}
 
-	// Verify help bar shows toggle shutdown hook
-	if !strings.Contains(view.Content, "toggle shutdown hook") {
-		t.Error("View should show shutdown hook toggle in help bar")
+	// Verify help bar shows toggle stop on exit
+	if !strings.Contains(view.Content, "toggle stop on exit") {
+		t.Error("View should show stop on exit toggle in help bar")
 	}
 
 	t.Logf("Combined view output:\n%s", view.Content)
@@ -938,34 +938,34 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 	m.Height = 30
 	m.SpinnerStopped = true
 
-	// Step 1: Initially inactive — view must NOT show shutdown hook
+	// Step 1: Initially inactive — view must NOT show stop on exit badge
 	view := m.View()
-	if strings.Contains(view.Content, "Shutdown on exit") {
-		t.Error("Step 1: view should NOT show shutdown hook initially")
+	if strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+		t.Error("Step 1: view should NOT show stop on exit badge initially")
 	}
 
 	// Step 2: Toggle on via 't' key press
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: 't'})
 	m = newModel.(*Model)
 	if !m.ShutdownHookActive {
-		t.Fatal("Step 2: shutdown hook should be active after toggle")
+		t.Fatal("Step 2: stop on exit should be active after toggle")
 	}
 
 	view = m.View()
-	if !strings.Contains(view.Content, "Shutdown on exit") {
-		t.Error("Step 2: view should show shutdown hook after toggle on")
+	if !strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+		t.Error("Step 2: view should show stop on exit badge after toggle on")
 	}
 
 	// Step 3: Toggle off via 't' key press
 	newModel, _ = m.Update(tea.KeyPressMsg{Code: 't'})
 	m = newModel.(*Model)
 	if m.ShutdownHookActive {
-		t.Fatal("Step 3: shutdown hook should be inactive after second toggle")
+		t.Fatal("Step 3: stop on exit should be inactive after second toggle")
 	}
 
 	view = m.View()
-	if strings.Contains(view.Content, "Shutdown on exit") {
-		t.Error("Step 3: view should NOT show shutdown hook after toggle off")
+	if strings.Contains(view.Content, "⚡ Stop on exit ⚡") {
+		t.Error("Step 3: view should NOT show stop on exit badge after toggle off")
 	}
 }
 
