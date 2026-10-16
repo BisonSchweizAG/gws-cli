@@ -16,11 +16,17 @@ const notifyutilPath = "/usr/bin/notifyutil"
 // Note: the notification is posted when the shutdown is initiated, before apps are terminated.
 // A shutdown via the command line (e.g. `sudo shutdown -h now`) is not detected.
 func WaitForShutdown() (ReleaseFunc, error) {
+	log("WaitForShutdown: starting macOS shutdown watcher (notifyutil)")
 	if _, err := os.Stat(notifyutilPath); err != nil {
+		log("WaitForShutdown: notifyutil not found at %s: %v", notifyutilPath, err)
 		return nil, fmt.Errorf("shutdown detection not available: %w", err)
 	}
 	if err := waitForNotification(notifyutilPath, notifyShutdownInitiated); err != nil {
+		log("WaitForShutdown: waitForNotification error: %v", err)
 		return nil, err
 	}
-	return func() {}, nil
+	log("WaitForShutdown: shutdown notification received, triggering shutdown hook")
+	return func() {
+		log("WaitForShutdown: release function called")
+	}, nil
 }

@@ -83,6 +83,7 @@ type winMsg struct {
 // used to receive WM_QUERYENDSESSION / WM_ENDSESSION. The session end is blocked until the
 // returned ReleaseFunc is called (or releaseTimeout elapsed).
 func WaitForShutdown() (ReleaseFunc, error) {
+	log("WaitForShutdown: starting Windows shutdown watcher")
 	detected := make(chan struct{})
 	released := make(chan struct{})
 	errCh := make(chan error, 1)
@@ -91,8 +92,13 @@ func WaitForShutdown() (ReleaseFunc, error) {
 
 	select {
 	case <-detected:
-		return sync.OnceFunc(func() { close(released) }), nil
+		log("WaitForShutdown: shutdown detected, returning release function")
+		return sync.OnceFunc(func() {
+			log("WaitForShutdown: release function called")
+			close(released)
+		}), nil
 	case err := <-errCh:
+		log("WaitForShutdown: error from message loop: %v", err)
 		return nil, err
 	}
 }
@@ -123,26 +129,46 @@ func messageLoop(detected chan<- struct{}, released <-chan struct{}, errCh chan<
 	wndProc := func(hwnd, msg, wParam, lParam uintptr) uintptr {
 		switch msg {
 		case wmQueryEndSession:
+			isReboot := wParam&ewxReboot != 0
+			sessionEnd := isSessionEnd(lParam)
+			log("WM_QUERYENDSESSION received: wParam=0x%08x, lParam=0x%08x, ewxReboot=%v, isSessionEnd=%v",
+				wParam, lParam, isReboot, sessionEnd)
 			// Skip reboot: wParam carries the EWX_REBOOT flag on modern Windows.
 			if wParam&ewxReboot == 0 && isSessionEnd(lParam) {
+				log("WM_QUERYENDSESSION: blocking shutdown (not reboot, is session end)")
 				// Shows the reason to the user and gives us time to stop the workstations.
 				_, _, _ = procShutdownBlockReasonCreate.Call(hwnd, uintptr(unsafe.Pointer(reason)))
+			} else {
+				if isReboot {
+					log("WM_QUERYENDSESSION: skipping — reboot detected via EWX_REBOOT flag")
+				} else if !sessionEnd {
+					log("WM_QUERYENDSESSION: skipping — not a session end (close-app only)")
+				}
 			}
 			return 1 // allow the session to end
 		case wmEndSession:
+			isReboot := wParam&ewxReboot != 0
+			sessionEnd := isSessionEnd(lParam)
+			log("WM_ENDSESSION received: wParam=0x%08x, lParam=0x%08x, ewxReboot=%v, isSessionEnd=%v, wParamNonZero=%v",
+				wParam, lParam, isReboot, sessionEnd, wParam != 0)
 			// Skip reboot: wParam carries the EWX_REBOOT flag on modern Windows.
 			if wParam&ewxReboot != 0 {
+				log("WM_ENDSESSION: ignoring — reboot detected via EWX_REBOOT flag")
 				return 0
 			}
 			if !isSessionEnd(lParam) {
+				log("WM_ENDSESSION: ignoring — not a session end (close-app only)")
 				return 0
 			}
 			if wParam != 0 { // session is really ending
+				log("WM_ENDSESSION: triggering shutdown hook — session is ending")
 				notify.Do(func() { close(detected) })
 				// The process may be terminated as soon as we return: wait for the caller.
 				select {
 				case <-released:
+					log("WM_ENDSESSION: released by caller")
 				case <-time.After(releaseTimeout):
+					log("WM_ENDSESSION: release timeout elapsed (%v)", releaseTimeout)
 				}
 			}
 			_, _, _ = procShutdownBlockReasonDestroy.Call(hwnd)
