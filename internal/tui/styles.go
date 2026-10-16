@@ -105,7 +105,7 @@ func DefaultStyles() *Styles {
 		Foreground(Amber)
 	s.ShutdownHook = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(White).
+		Foreground(lipgloss.Color("235")).
 		Background(Amber).
 		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).

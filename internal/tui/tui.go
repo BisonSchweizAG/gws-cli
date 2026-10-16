@@ -295,7 +295,14 @@ func (m *Model) View() tea.View {
 	var left strings.Builder
 	badge := m.Styles.Badge.Render(" GWS ")
 	title := m.Styles.Title.Render(m.Title)
-	left.WriteString(lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title))
+	var titleRow string
+	if m.ShutdownHookActive {
+		shutdown := m.Styles.ShutdownHook.Render("⚡ Shutdown on exit")
+		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title, "  ", shutdown)
+	} else {
+		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title)
+	}
+	left.WriteString(titleRow)
 	left.WriteString("\n\n")
 
 	var currCtx *types.Context
@@ -329,43 +336,23 @@ func (m *Model) View() tea.View {
 		fmt.Fprintf(&left, "  %-13s%s\n", h.Key+":", h.Value)
 	}
 
+	// Add shutdown hook status to the header row
+	if m.ShutdownHookActive {
+		fmt.Fprintf(&left, "  Shutdown:    %s\n", m.Styles.ShutdownHook.Render("⚡ Shutdown on exit"))
+	}
+
 	logo := m.Styles.Logo.Render(strings.TrimRight(version.Logo, "\n"))
 	logoWidth := lipgloss.Width(logo)
-
-	// Build the shutdown hook column
-	var shutdownCol string
-	shutdownColWidth := 0
-	if m.ShutdownHookActive {
-		shutdownCol = m.Styles.ShutdownHook.Render(" 🚧 Shutdown Hook Active 🚧 ")
-		shutdownColWidth = lipgloss.Width(shutdownCol)
-	}
 
 	leftContentWidth := lipgloss.Width(left.String())
 
 	var header string
-	totalRight := logoWidth + shutdownColWidth
-	if totalRight > 0 {
-		separator := ""
-		if shutdownColWidth > 0 {
-			separator = "  "
-		}
-		rightContent := lipgloss.JoinHorizontal(lipgloss.Top, shutdownCol, separator, logo)
-		rightWidth := lipgloss.Width(rightContent)
-		if innerWidth > leftContentWidth+rightWidth {
-			leftWidth := innerWidth - rightWidth
-			leftStyled := lipgloss.NewStyle().Width(leftWidth).Render(left.String())
-			header = lipgloss.JoinHorizontal(lipgloss.Top, leftStyled, rightContent)
-		} else {
-			header = lipgloss.JoinHorizontal(lipgloss.Top, left.String(), "  ", rightContent)
-		}
+	if innerWidth > leftContentWidth+logoWidth {
+		leftWidth := innerWidth - logoWidth
+		leftStyled := lipgloss.NewStyle().Width(leftWidth).Render(left.String())
+		header = lipgloss.JoinHorizontal(lipgloss.Top, leftStyled, logo)
 	} else {
-		if innerWidth > leftContentWidth+logoWidth {
-			leftWidth := innerWidth - logoWidth
-			leftStyled := lipgloss.NewStyle().Width(leftWidth).Render(left.String())
-			header = lipgloss.JoinHorizontal(lipgloss.Top, leftStyled, logo)
-		} else {
-			header = lipgloss.JoinHorizontal(lipgloss.Top, left.String(), "  ", logo)
-		}
+		header = lipgloss.JoinHorizontal(lipgloss.Top, left.String(), "  ", logo)
 	}
 
 	var b strings.Builder
