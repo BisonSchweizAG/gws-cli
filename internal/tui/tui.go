@@ -46,8 +46,9 @@ type Model struct {
 	// New version notification
 	NewVersionAvailable string
 
-	// Shutdown hook status
-	ShutdownHookActive bool
+	// Shutdown hook support (only enabled for tunnel command)
+	ShutdownHookEnabled bool
+	ShutdownHookActive  bool
 
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
@@ -128,8 +129,8 @@ func (m *Model) Init() tea.Cmd {
 		checkForNewVersion,
 	}
 
-	// Set shutdown hook status based on current context config
-	if m.Config != nil {
+	// Set shutdown hook status based on current context config (only for tunnel command)
+	if m.ShutdownHookEnabled && m.Config != nil {
 		if currCtx := m.Config.CurrentContext(); currCtx != nil && currCtx.StopWorkstationOnExitTunnel {
 			m.ShutdownHookActive = true
 		}
@@ -193,7 +194,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.Done {
 			return m, tea.Quit
 		}
-		if msg.String() == "s" && m.Config != nil {
+		if msg.String() == "s" && m.ShutdownHookEnabled && m.Config != nil {
 			currCtx := m.Config.CurrentContext()
 			if currCtx != nil {
 				currCtx.StopWorkstationOnExitTunnel = !currCtx.StopWorkstationOnExitTunnel
@@ -270,7 +271,7 @@ func (m *Model) View() tea.View {
 	badge := m.Styles.Badge.Render(" GWS ")
 	title := m.Styles.Title.Render(m.Title)
 	var titleRow string
-	if m.ShutdownHookActive {
+	if m.ShutdownHookEnabled && m.ShutdownHookActive {
 		shutdown := m.Styles.ShutdownHook.Render("⚡ Stop WS on exit ⚡")
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title, "  ", shutdown)
 	} else {

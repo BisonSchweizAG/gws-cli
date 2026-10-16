@@ -63,6 +63,9 @@ var tunnelCmd = &cobra.Command{
 		}
 		m.AddHeader("SSH Port", m.Styles.SSH.Render(strconv.Itoa(port)))
 
+		// Enable shutdown hook toggle (only for tunnel command)
+		m.ShutdownHookEnabled = true
+
 		// Listen for SIGHUP (terminal close) so shutdown runs when the terminal is closed.
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGHUP)
