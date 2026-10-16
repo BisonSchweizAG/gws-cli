@@ -311,9 +311,6 @@ func (m *Model) View() tea.View {
 		)
 	}
 	fmt.Fprintf(&left, "  Version:     %s\n", versionLine)
-	if m.ShutdownHookActive {
-		fmt.Fprint(&left, "  ⚠ Shutdown Hook active\n")
-	}
 	if m.Config != nil && m.Config.FilePath != "" {
 		fmt.Fprintf(&left, "  Config File: %s\n", m.Config.FilePath)
 	}
@@ -335,15 +332,40 @@ func (m *Model) View() tea.View {
 	logo := m.Styles.Logo.Render(strings.TrimRight(version.Logo, "\n"))
 	logoWidth := lipgloss.Width(logo)
 
+	// Build the shutdown hook column
+	var shutdownCol string
+	shutdownColWidth := 0
+	if m.ShutdownHookActive {
+		shutdownCol = m.Styles.ShutdownHook.Render(" 🚧 Shutdown Hook Active 🚧 ")
+		shutdownColWidth = lipgloss.Width(shutdownCol)
+	}
+
 	leftContentWidth := lipgloss.Width(left.String())
 
 	var header string
-	if innerWidth > leftContentWidth+logoWidth {
-		leftWidth := innerWidth - logoWidth
-		leftStyled := lipgloss.NewStyle().Width(leftWidth).Render(left.String())
-		header = lipgloss.JoinHorizontal(lipgloss.Top, leftStyled, logo)
+	totalRight := logoWidth + shutdownColWidth
+	if totalRight > 0 {
+		separator := ""
+		if shutdownColWidth > 0 {
+			separator = "  "
+		}
+		rightContent := lipgloss.JoinHorizontal(lipgloss.Top, shutdownCol, separator, logo)
+		rightWidth := lipgloss.Width(rightContent)
+		if innerWidth > leftContentWidth+rightWidth {
+			leftWidth := innerWidth - rightWidth
+			leftStyled := lipgloss.NewStyle().Width(leftWidth).Render(left.String())
+			header = lipgloss.JoinHorizontal(lipgloss.Top, leftStyled, rightContent)
+		} else {
+			header = lipgloss.JoinHorizontal(lipgloss.Top, left.String(), "  ", rightContent)
+		}
 	} else {
-		header = lipgloss.JoinHorizontal(lipgloss.Top, left.String(), "  ", logo)
+		if innerWidth > leftContentWidth+logoWidth {
+			leftWidth := innerWidth - logoWidth
+			leftStyled := lipgloss.NewStyle().Width(leftWidth).Render(left.String())
+			header = lipgloss.JoinHorizontal(lipgloss.Top, leftStyled, logo)
+		} else {
+			header = lipgloss.JoinHorizontal(lipgloss.Top, left.String(), "  ", logo)
+		}
 	}
 
 	var b strings.Builder
