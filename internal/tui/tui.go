@@ -51,8 +51,9 @@ type Model struct {
 	ShutdownHookActive  bool
 
 	// Shutdown confirmation prompt
-	ShutdownConfirming bool
-	ShutdownConfirmRem int // remaining seconds
+	ShutdownConfirming     bool
+	ShutdownConfirmRem     int  // remaining seconds
+	ShutdownConfirmSelected int  // 0=Yes (default), 1=No
 
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
@@ -206,18 +207,67 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if m.ShutdownConfirming {
-			if msg.String() == "y" || msg.String() == "Y" {
-				// Confirm shutdown
+			// Esc — cancel confirmation, go back to tunnel UI
+			if msg.String() == "esc" {
 				m.ShutdownConfirming = false
+				m.ShutdownConfirmRem = 0
+				m.ShutdownConfirmSelected = 0
+				return m, nil
+			}
+			// Left/Right arrow keys — navigate between Yes and No
+			if msg.String() == "left" || msg.String() == "h" {
+				m.ShutdownConfirmSelected = 0 // Yes
+				return m, nil
+			}
+			if msg.String() == "right" || msg.String() == "l" {
+				m.ShutdownConfirmSelected = 1 // No
+				return m, nil
+			}
+			// Enter — trigger the selected button
+			if msg.String() == "enter" {
+				if m.ShutdownConfirmSelected == 0 {
+					// Yes — stop workstation and exit TUI
+					m.ShutdownConfirming = false
+					m.Quitting = true
+					m.cancel()
+					return m, tea.Quit
+				} else {
+					// No — exit TUI without stopping the workstation
+					m.ShutdownConfirming = false
+					m.ShutdownHookActive = false
+					if m.Config != nil {
+						if currCtx := m.Config.CurrentContext(); currCtx != nil {
+							currCtx.StopWorkstationOnExitTunnel = false
+							_ = m.Config.SaveConfig()
+						}
+					}
+					m.Quitting = true
+					m.cancel()
+					return m, tea.Quit
+				}
+			}
+			// Legacy Y/N key support
+			if msg.String() == "y" || msg.String() == "Y" {
+				// Confirm shutdown — stop workstation and exit TUI
+				m.ShutdownConfirming = false
+				// Keep ShutdownHookActive true so tunnel.go stops the workstation
 				m.Quitting = true
 				m.cancel()
 				return m, tea.Quit
 			}
 			if msg.String() == "n" || msg.String() == "N" {
-				// Cancel shutdown, go back to normal
+				// Cancel shutdown — exit TUI without stopping the workstation
 				m.ShutdownConfirming = false
-				m.ShutdownConfirmRem = 0
-				return m, nil
+				m.ShutdownHookActive = false
+				if m.Config != nil {
+					if currCtx := m.Config.CurrentContext(); currCtx != nil {
+						currCtx.StopWorkstationOnExitTunnel = false
+						_ = m.Config.SaveConfig()
+					}
+				}
+				m.Quitting = true
+				m.cancel()
+				return m, tea.Quit
 			}
 			return m, nil
 		}
@@ -291,8 +341,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.ShutdownConfirmRem--
 		if m.ShutdownConfirmRem <= 0 {
-			// Timeout — proceed with shutdown (default Yes)
+			// Timeout — stop workstation and exit TUI (default Yes)
 			m.ShutdownConfirming = false
+			// Keep ShutdownHookActive true so tunnel.go stops the workstation
 			m.Quitting = true
 			m.cancel()
 			return m, tea.Quit
@@ -463,13 +514,23 @@ func (m *Model) View() tea.View {
 		confirmCard.WriteString("\n\n")
 		confirmCard.WriteString("Stop workstation on exit?")
 		confirmCard.WriteString("\n\n")
-		confirmCard.WriteString(fmt.Sprintf("  Auto-confirm in %d seconds...", m.ShutdownConfirmRem))
+		fmt.Fprintf(&confirmCard, "  Auto-confirm in %d seconds...", m.ShutdownConfirmRem)
 		confirmCard.WriteString("\n\n")
-		yesKey := m.Styles.HelpKey.Render("Y")
-		yesDesc := m.Styles.Success.Render("es (default)")
-		noKey := m.Styles.HelpKey.Render("N")
-		noDesc := m.Styles.Help.Render("o (cancel)")
-		confirmCard.WriteString("  " + yesKey + " " + yesDesc + "    " + noKey + " " + noDesc)
+
+		// Build Yes/No buttons with focus highlighting
+		var yesBtn, noBtn string
+		if m.ShutdownConfirmSelected == 0 {
+			// Yes is selected
+			yesBtn = m.Styles.Badge.Background(Green).Render("  Yes  ")
+			noBtn = m.Styles.Help.Render(" [No] ")
+		} else {
+			// No is selected
+			yesBtn = m.Styles.Help.Render(" [Yes] ")
+			noBtn = m.Styles.Badge.Background(HotPink).Render("  No  ")
+		}
+		confirmCard.WriteString("  " + yesBtn + "    " + noBtn)
+		confirmCard.WriteString("\n\n")
+		confirmCard.WriteString(m.Styles.Help.Render("  Arrow keys: navigate  Enter: select  Esc: cancel"))
 		confirmCard.WriteString("\n")
 		confirmCardRendered := m.Styles.Card.Width(innerWidth).Render(confirmCard.String())
 		b.WriteString(confirmCardRendered)
