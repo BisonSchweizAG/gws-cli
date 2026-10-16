@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -22,6 +24,23 @@ const (
 	defaultSSHTimeoutSeconds   = 30
 	defaultStartTimeoutSeconds = 300
 )
+
+// yamlUnicodeEscapeRe matches YAML unicode escape sequences like \U0001F3E0.
+// The gopkg.in/yaml.v3 encoder escapes non-ASCII characters (including emojis)
+// to these sequences. This regex is used to convert them back to UTF-8.
+var yamlUnicodeEscapeRe = regexp.MustCompile(`\\U([0-9a-fA-F]{8})`)
+
+// unescapeYAMLUnicode converts YAML unicode escape sequences back to their
+// corresponding UTF-8 characters, so emojis are preserved in the config file.
+func unescapeYAMLUnicode(s string) string {
+	return yamlUnicodeEscapeRe.ReplaceAllStringFunc(s, func(match string) string {
+		codePoint, err := strconv.ParseInt(match[2:], 16, 32)
+		if err != nil {
+			return match
+		}
+		return string(rune(codePoint))
+	})
+}
 
 type Config struct {
 	Contexts            map[string]*Context `validate:"required,dive,required"    yaml:"contexts"`
@@ -256,7 +275,11 @@ func (c *Config) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(c.FilePath, buf.Bytes(), 0o600)
+	// The gopkg.in/yaml.v3 encoder escapes non-ASCII characters (e.g. emojis)
+	// to Unicode escape sequences like \U0001F3E0. Convert them back to UTF-8
+	// so the config file remains human-readable.
+	data := []byte(unescapeYAMLUnicode(buf.String()))
+	return os.WriteFile(c.FilePath, data, 0o600)
 }
 
 func (c *Config) SetToken(token oauth2.Token) error {

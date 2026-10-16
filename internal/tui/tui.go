@@ -260,7 +260,12 @@ func (m *Model) View() tea.View {
 		fmt.Fprintf(&left, "  Config File: %s\n", m.Config.FilePath)
 	}
 	if m.Config != nil && m.Config.CurrentContextName != "" {
-		fmt.Fprintf(&left, "  Context:     %s\n", m.Styles.Success.Render(m.Config.CurrentContextName))
+		ctx := m.Config.CurrentContext()
+		displayName := m.Config.CurrentContextName
+		if ctx != nil {
+			displayName = ctx.FormatName(m.Config.CurrentContextName)
+		}
+		fmt.Fprintf(&left, "  Context:     %s\n", m.Styles.Success.Render(displayName))
 	}
 	if currCtx != nil && currCtx.GCloud != nil {
 		fmt.Fprintf(&left, "  Workstation: %s\n", m.Styles.Success.Render(currCtx.GCloud.Name))

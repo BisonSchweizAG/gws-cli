@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/workstations/apiv1/workstationspb"
+
+	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
 func Test_formatContext(t *testing.T) {
@@ -12,17 +14,27 @@ func Test_formatContext(t *testing.T) {
 		name     string
 		ctx      string
 		current  string
+		contexts map[string]*types.Context
 		expected string
 	}{
-		{"matching context", "my-context", "my-context", "my-context ✅"},
-		{"different context", "other-context", "my-context", "other-context"},
-		{"empty current context", "my-context", "", "my-context"},
-		{"empty both", "", "", ""},
+		{"matching context", "my-context", "my-context", nil, "my-context ✅"},
+		{"different context", "other-context", "my-context", nil, "other-context"},
+		{"empty current context", "my-context", "", nil, "my-context"},
+		{"empty both", "", "", nil, ""},
+		{"with icon", "my-context", "", map[string]*types.Context{"my-context": {Icon: "🏠"}}, "🏠 my-context"},
+		{
+			"with icon and matching context",
+			"my-context",
+			"my-context",
+			map[string]*types.Context{"my-context": {Icon: "🏠"}},
+			"🏠 my-context ✅",
+		},
+		{"icon context not in map", "my-context", "", map[string]*types.Context{"other": {Icon: "🏠"}}, "my-context"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formatContext(tt.ctx, tt.current); got != tt.expected {
+			if got := formatContext(tt.ctx, tt.current, tt.contexts); got != tt.expected {
 				t.Errorf("formatContext() = %v, want %v", got, tt.expected)
 			}
 		})
