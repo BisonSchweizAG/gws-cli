@@ -16,6 +16,14 @@ import (
 
 const TokenFileName = "token.yaml"
 
+const envIgnoreKeyringFallback = "GWS_IGNORE_KEYRING_FALLBACK"
+
+// shouldLogKeyringFallback returns true if keyring fallback errors should be logged.
+// It returns false when the GWS_IGNORE_KEYRING_FALLBACK env var is set.
+func shouldLogKeyringFallback() bool {
+	return os.Getenv(envIgnoreKeyringFallback) == ""
+}
+
 type TokenStorage struct {
 	Token oauth2.Token `yaml:"token"`
 }
@@ -45,7 +53,9 @@ func LoadToken() (*oauth2.Token, error) {
 	}
 	if !errors.Is(err, keyring.ErrNotFound) {
 		// Some other keyring error — fallthrough to file-based fallback
-		log.Logf("Keyring read error: %v; falling back to file storage", err)
+		if shouldLogKeyringFallback() {
+			log.Logf("Keyring read error: %v; falling back to file storage", err)
+		}
 	}
 
 	tokenPath, err := GetTokenFilePath()
@@ -89,7 +99,9 @@ func SaveToken(token oauth2.Token) error {
 		log.Logf("🎟 Stored token in OS keyring")
 		return nil
 	}
-	log.Logf("Keyring write error: %v; falling back to file storage", err)
+	if shouldLogKeyringFallback() {
+		log.Logf("Keyring write error: %v; falling back to file storage", err)
+	}
 
 	tokenPath, err := GetTokenFilePath()
 	if err != nil {
@@ -115,7 +127,9 @@ func SetToken(token oauth2.Token) error {
 func DeleteToken() error {
 	err := keyring.Delete("gws", "token")
 	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
-		log.Logf("Keyring delete error: %v", err)
+		if shouldLogKeyringFallback() {
+			log.Logf("Keyring delete error: %v", err)
+		}
 	}
 
 	tokenPath, err := GetTokenFilePath()
