@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -60,7 +63,15 @@ var tunnelCmd = &cobra.Command{
 		}
 		m.AddHeader("SSH Port", m.Styles.SSH.Render(strconv.Itoa(port)))
 
+		// Listen for SIGHUP (terminal close) so shutdown runs when the terminal is closed.
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGHUP)
 		p := tea.NewProgram(m)
+		go func() {
+			<-sigCh
+			p.Send(tea.QuitMsg{})
+		}()
+
 		_, err = p.Run()
 
 		// Stop workstations on exit for contexts where the flag is set.

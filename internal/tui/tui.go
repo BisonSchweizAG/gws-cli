@@ -11,7 +11,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/atotto/clipboard"
 
-	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/types"
 	"github.com/bisonschweizag/gws-cli/internal/update"
@@ -103,9 +102,6 @@ type (
 	newVersionAvailableMsg struct{ latestVersion string }
 )
 
-// stopOnExitTimeout limits the time spent stopping workstations when exiting.
-const stopOnExitTimeout = 10 * time.Second
-
 func (m *Model) Init() tea.Cmd {
 	log.SetLogger(func(l string) {
 		select {
@@ -192,12 +188,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			m.Quitting = true
 			m.cancel()
-			// Stop workstations on exit for contexts where the flag is set
-			if m.Config != nil {
-				ctx, cancel := context.WithTimeout(context.Background(), stopOnExitTimeout)
-				_ = gcloud.StopWorkstationsForContexts(ctx, m.Config)
-				cancel()
-			}
 			return m, tea.Quit
 		}
 		if m.Done {
