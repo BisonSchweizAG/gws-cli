@@ -476,8 +476,8 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 		return nil
 	})
 
-	// Press 't' to toggle stop on exit on
-	newModel, _ := m.Update(tea.KeyPressMsg{Code: 't'})
+	// Press 's' to toggle stop on exit on
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 's'})
 	m2, ok := newModel.(*Model)
 	if !ok {
 		t.Fatalf("expected *Model, got %T", newModel)
@@ -489,8 +489,8 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 		t.Error("expected context StopWorkstationOnExitTunnel to be true")
 	}
 
-	// Press 't' again to toggle off
-	newModel, _ = m2.Update(tea.KeyPressMsg{Code: 't'})
+	// Press 's' again to toggle off
+	newModel, _ = m2.Update(tea.KeyPressMsg{Code: 's'})
 	m3, ok := newModel.(*Model)
 	if !ok {
 		t.Fatalf("expected *Model, got %T", newModel)
@@ -657,7 +657,7 @@ func TestRenderHelpBar(t *testing.T) {
 
 	help := styles.RenderHelpBar(
 		[2]string{"Ctrl+C", "quit"},
-		[2]string{"t", "toggle"},
+		[2]string{"s", "toggle"},
 	)
 
 	if !strings.Contains(help, "Ctrl+C") {
@@ -791,7 +791,7 @@ func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 	})
 
 	// Toggle on
-	newModel, _ := m.Update(tea.KeyPressMsg{Code: 't'})
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 's'})
 	m2, ok := newModel.(*Model)
 	if !ok {
 		t.Fatal("expected *Model after toggle on")
@@ -809,7 +809,7 @@ func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 	}
 
 	// Toggle off
-	newModel, _ = m2.Update(tea.KeyPressMsg{Code: 't'})
+	newModel, _ = m2.Update(tea.KeyPressMsg{Code: 's'})
 	m3, ok := newModel.(*Model)
 	if !ok {
 		t.Fatal("expected *Model after toggle off")
@@ -985,8 +985,8 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 		t.Error("Step 1: view should NOT show stop on exit badge initially")
 	}
 
-	// Step 2: Toggle on via 't' key press
-	newModel, _ := m.Update(tea.KeyPressMsg{Code: 't'})
+	// Step 2: Toggle on via 's' key press
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: 's'})
 	m, ok := newModel.(*Model)
 	if !ok {
 		t.Fatal("expected *Model after toggle on")
@@ -1000,8 +1000,8 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 		t.Error("Step 2: view should show stop on exit badge after toggle on")
 	}
 
-	// Step 3: Toggle off via 't' key press
-	newModel, _ = m.Update(tea.KeyPressMsg{Code: 't'})
+	// Step 3: Toggle off via 's' key press
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: 's'})
 	m, ok = newModel.(*Model)
 	if !ok {
 		t.Fatal("expected *Model after toggle off")

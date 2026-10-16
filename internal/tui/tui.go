@@ -203,7 +203,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.Done {
 			return m, tea.Quit
 		}
-		if msg.String() == "t" && m.Config != nil {
+		if msg.String() == "s" && m.Config != nil {
 			currCtx := m.Config.CurrentContext()
 			if currCtx != nil {
 				currCtx.StopWorkstationOnExitTunnel = !currCtx.StopWorkstationOnExitTunnel
@@ -427,7 +427,7 @@ func (m *Model) View() tea.View {
 		help = m.Styles.RenderHelpBar([2]string{"Any key", "quit"})
 	default:
 		help = m.Styles.RenderHelpBar(
-			[2]string{"t", "toggle stop on exit"},
+			[2]string{"s", "toggle stop on exit"},
 			[2]string{"Ctrl+C", "quit"},
 		)
 	}
