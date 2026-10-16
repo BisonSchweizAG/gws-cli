@@ -212,7 +212,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Logs = append(m.Logs, fmt.Sprintf("⚠ Failed to save config: %v", err))
 				}
 				if m.ShutdownHookActive {
-					m.Logs = append(m.Logs, "⚠  Stop on exit enabled — workstations will stop when tunnel exits")
+					m.Logs = append(m.Logs, "⚠  Stop on exit enabled — workstation will stop when tunnel exits")
 				} else {
 					m.Logs = append(m.Logs, "✓ Stop on exit disabled")
 				}
