@@ -20,6 +20,10 @@ const (
 	endSessionCloseApp = 0x00000001
 	endSessionLogoff   = 0x80000000
 
+	// ewxReboot is the EWX_REBOOT flag carried in wParam of WM_QUERYENDSESSION
+	// on modern Windows, indicating a restart rather than a power-off shutdown.
+	ewxReboot = 0x00000002
+
 	errorClassAlreadyExists = 1410
 
 	windowClassName = "GWSShutdownWatcher"
@@ -70,7 +74,8 @@ type winMsg struct {
 	LPrivate uint32
 }
 
-// WaitForShutdown blocks until the Windows session ends (shutdown, restart or logoff).
+// WaitForShutdown blocks until the Windows session ends (shutdown or logoff).
+// It ignores restart (reboot) events.
 //
 // Console control events (CTRL_SHUTDOWN_EVENT / CTRL_LOGOFF_EVENT) are not delivered to
 // processes that load user32.dll (which gws does, e.g. for the clipboard), and the process
@@ -118,12 +123,17 @@ func messageLoop(detected chan<- struct{}, released <-chan struct{}, errCh chan<
 	wndProc := func(hwnd, msg, wParam, lParam uintptr) uintptr {
 		switch msg {
 		case wmQueryEndSession:
-			if isSessionEnd(lParam) {
+			// Skip reboot: wParam carries the EWX_REBOOT flag on modern Windows.
+			if wParam&ewxReboot == 0 && isSessionEnd(lParam) {
 				// Shows the reason to the user and gives us time to stop the workstations.
 				_, _, _ = procShutdownBlockReasonCreate.Call(hwnd, uintptr(unsafe.Pointer(reason)))
 			}
 			return 1 // allow the session to end
 		case wmEndSession:
+			// Skip reboot: wParam carries the EWX_REBOOT flag on modern Windows.
+			if wParam&ewxReboot != 0 {
+				return 0
+			}
 			if !isSessionEnd(lParam) {
 				return 0
 			}
