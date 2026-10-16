@@ -18,6 +18,8 @@ type Context struct {
 
 	Dirs  []Dir  `yaml:"dirs,omitempty"`
 	Files []File `validate:"dive,required" yaml:"files,omitempty"`
+
+	StopWorkstationOnExitTunnel bool `yaml:"stopWorkstationOnExitTunnel,omitempty"`
 }
 
 type GCloud struct {

@@ -132,9 +132,11 @@ func (m *Model) Init() tea.Cmd {
 		checkForNewVersion,
 	}
 
-	// Set shutdown hook status based on config
-	if m.Config != nil && m.Config.StopWorkstationOnExitTunnel {
-		m.ShutdownHookActive = true
+	// Set shutdown hook status based on current context config
+	if m.Config != nil {
+		if currCtx := m.Config.CurrentContext(); currCtx != nil && currCtx.StopWorkstationOnExitTunnel {
+			m.ShutdownHookActive = true
+		}
 	}
 
 	return tea.Batch(cmds...)
@@ -190,11 +192,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			m.Quitting = true
 			m.cancel()
-			// Stop workstations on exit if configured
-			if m.Config != nil && m.Config.StopWorkstationOnExitTunnel {
-				log.Log("🔌 Exiting — stopping all workstations...")
+			// Stop workstations on exit for contexts where the flag is set
+			if m.Config != nil {
 				ctx, cancel := context.WithTimeout(context.Background(), stopOnExitTimeout)
-				_ = gcloud.StopAllWorkstationsNow(ctx, m.Config)
+				_ = gcloud.StopWorkstationsForContexts(ctx, m.Config)
 				cancel()
 			}
 			return m, tea.Quit
@@ -203,18 +204,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if msg.String() == "t" && m.Config != nil {
-			m.Config.StopWorkstationOnExitTunnel = !m.Config.StopWorkstationOnExitTunnel
-			m.ShutdownHookActive = m.Config.StopWorkstationOnExitTunnel
-			if err := m.Config.SaveConfig(); err != nil {
-				m.Logs = append(m.Logs, fmt.Sprintf("⚠ Failed to save config: %v", err))
+			currCtx := m.Config.CurrentContext()
+			if currCtx != nil {
+				currCtx.StopWorkstationOnExitTunnel = !currCtx.StopWorkstationOnExitTunnel
+				m.ShutdownHookActive = currCtx.StopWorkstationOnExitTunnel
+				if err := m.Config.SaveConfig(); err != nil {
+					m.Logs = append(m.Logs, fmt.Sprintf("⚠ Failed to save config: %v", err))
+				}
+				if m.ShutdownHookActive {
+					m.Logs = append(m.Logs, "⚠  Stop on exit enabled — workstations will stop when tunnel exits")
+				} else {
+					m.Logs = append(m.Logs, "✓ Stop on exit disabled")
+				}
+				cmd := m.waitForLog()
+				return m, cmd
 			}
-			if m.ShutdownHookActive {
-				m.Logs = append(m.Logs, "⚠ Stop on exit enabled — workstations will stop when tunnel exits")
-			} else {
-				m.Logs = append(m.Logs, "✓ Stop on exit disabled")
-			}
-			cmd := m.waitForLog()
-			return m, cmd
 		}
 		if m.AuthURL != "" && msg.String() == "ctrl+y" {
 			_ = clipboard.WriteAll(m.AuthURL)

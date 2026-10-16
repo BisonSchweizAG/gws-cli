@@ -113,10 +113,15 @@ func TestTUI_ClipboardCopy(t *testing.T) {
 
 func TestTUIView_ShutdownHook(t *testing.T) {
 	cfg := &types.Config{
-		FilePath:                    "/path/to/config.yaml",
-		CurrentContextName:          "default",
-		StopWorkstationOnExitTunnel: true,
+		FilePath:           "/path/to/config.yaml",
+		CurrentContextName: "default",
+		Contexts: map[string]*types.Context{
+			"default": {
+				StopWorkstationOnExitTunnel: true,
+			},
+		},
 	}
+	_ = cfg.UseContext("default")
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
 		return nil
@@ -455,11 +460,17 @@ func TestUpdate_NewVersionAvailable(t *testing.T) {
 }
 
 func TestUpdate_ShutdownToggle(t *testing.T) {
-	cfg := &types.Config{
-		FilePath:                    "/path/to/config.yaml",
-		CurrentContextName:          "default",
+	ctx := &types.Context{
 		StopWorkstationOnExitTunnel: false,
 	}
+	cfg := &types.Config{
+		FilePath:           "/path/to/config.yaml",
+		CurrentContextName: "default",
+		Contexts: map[string]*types.Context{
+			"default": ctx,
+		},
+	}
+	_ = cfg.UseContext("default")
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
 		return nil
@@ -474,8 +485,8 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 	if !m2.ShutdownHookActive {
 		t.Error("expected ShutdownHookActive to be true after toggle")
 	}
-	if !cfg.StopWorkstationOnExitTunnel {
-		t.Error("expected config StopWorkstationOnExitTunnel to be true")
+	if !ctx.StopWorkstationOnExitTunnel {
+		t.Error("expected context StopWorkstationOnExitTunnel to be true")
 	}
 
 	// Press 't' again to toggle off
@@ -487,8 +498,8 @@ func TestUpdate_ShutdownToggle(t *testing.T) {
 	if m3.ShutdownHookActive {
 		t.Error("expected ShutdownHookActive to be false after second toggle")
 	}
-	if cfg.StopWorkstationOnExitTunnel {
-		t.Error("expected config StopWorkstationOnExitTunnel to be false")
+	if ctx.StopWorkstationOnExitTunnel {
+		t.Error("expected context StopWorkstationOnExitTunnel to be false")
 	}
 }
 
@@ -670,7 +681,7 @@ func TestNewModel(t *testing.T) {
 	}
 
 	operationCalled := false
-	operation := func(ctx context.Context) error {
+	operation := func(_ context.Context) error {
 		operationCalled = true
 		return nil
 	}
@@ -763,11 +774,17 @@ func TestTUIView_AuthURL_HelpBar(t *testing.T) {
 }
 
 func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
-	cfg := &types.Config{
-		FilePath:                    "/path/to/config.yaml",
-		CurrentContextName:          "default",
+	ctx := &types.Context{
 		StopWorkstationOnExitTunnel: false,
 	}
+	cfg := &types.Config{
+		FilePath:           "/path/to/config.yaml",
+		CurrentContextName: "default",
+		Contexts: map[string]*types.Context{
+			"default": ctx,
+		},
+	}
+	_ = cfg.UseContext("default")
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
 		return nil
@@ -775,7 +792,10 @@ func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 
 	// Toggle on
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: 't'})
-	m2, _ := newModel.(*Model)
+	m2, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model after toggle on")
+	}
 
 	found := false
 	for _, log := range m2.Logs {
@@ -790,7 +810,10 @@ func TestUpdate_ShutdownToggle_Logs(t *testing.T) {
 
 	// Toggle off
 	newModel, _ = m2.Update(tea.KeyPressMsg{Code: 't'})
-	m3, _ := newModel.(*Model)
+	m3, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model after toggle off")
+	}
 
 	found = false
 	for _, log := range m3.Logs {
@@ -817,12 +840,12 @@ func TestTUIView_MultipleHeaders(t *testing.T) {
 	m.Height = 30
 	m.SpinnerStopped = true
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		m.AddHeader(fmt.Sprintf("Header%d", i), fmt.Sprintf("Value%d", i))
 	}
 
 	view := m.View()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if !strings.Contains(view.Content, fmt.Sprintf("Header%d", i)) {
 			t.Errorf("View missing header %d", i)
 		}
@@ -846,7 +869,11 @@ func TestUpdate_LogMsg_Multiple(t *testing.T) {
 	for _, l := range logs {
 		var cmd tea.Cmd
 		m2, cmd := m.Update(logMsg(l))
-		m = m2.(*Model)
+		var ok bool
+		m, ok = m2.(*Model)
+		if !ok {
+			t.Fatal("expected *Model after log message")
+		}
 		if cmd == nil {
 			t.Error("expected non-nil command after log message")
 		}
@@ -874,10 +901,15 @@ func TestShutdownHookStyle(t *testing.T) {
 // TestTUIView_Visual_UpdateAndShutdownHook verifies the rendered view when both
 // a new version is available and the stop on exit is active.
 func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
-	cfg := &types.Config{
-		FilePath:                    "/path/to/config.yaml",
-		CurrentContextName:          "default",
+	ctx := &types.Context{
 		StopWorkstationOnExitTunnel: true,
+	}
+	cfg := &types.Config{
+		FilePath:           "/path/to/config.yaml",
+		CurrentContextName: "default",
+		Contexts: map[string]*types.Context{
+			"default": ctx,
+		},
 	}
 	_ = cfg.UseContext("default")
 
@@ -892,7 +924,10 @@ func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 
 	// Simulate receiving the new version available message
 	newModel, _ := m.Update(newVersionAvailableMsg{latestVersion: "v9.9.9"})
-	m = newModel.(*Model)
+	m, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model after newVersionAvailableMsg")
+	}
 
 	view := m.View()
 
@@ -925,11 +960,17 @@ func TestTUIView_Visual_UpdateAndShutdownHook(t *testing.T) {
 // TestTUIView_Visual_ShutdownToggleSequence verifies the full toggle sequence:
 // start inactive → toggle on → view shows indicator → toggle off → view hides indicator.
 func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
-	cfg := &types.Config{
-		FilePath:                    "/path/to/config.yaml",
-		CurrentContextName:          "default",
+	ctx := &types.Context{
 		StopWorkstationOnExitTunnel: false,
 	}
+	cfg := &types.Config{
+		FilePath:           "/path/to/config.yaml",
+		CurrentContextName: "default",
+		Contexts: map[string]*types.Context{
+			"default": ctx,
+		},
+	}
+	_ = cfg.UseContext("default")
 
 	m := NewModel(context.Background(), cfg, ">_ GWS Tunnel", func(context.Context) error {
 		return nil
@@ -946,7 +987,10 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 
 	// Step 2: Toggle on via 't' key press
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: 't'})
-	m = newModel.(*Model)
+	m, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model after toggle on")
+	}
 	if !m.ShutdownHookActive {
 		t.Fatal("Step 2: stop on exit should be active after toggle")
 	}
@@ -958,7 +1002,10 @@ func TestTUIView_Visual_ShutdownToggleSequence(t *testing.T) {
 
 	// Step 3: Toggle off via 't' key press
 	newModel, _ = m.Update(tea.KeyPressMsg{Code: 't'})
-	m = newModel.(*Model)
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model after toggle off")
+	}
 	if m.ShutdownHookActive {
 		t.Fatal("Step 3: stop on exit should be inactive after second toggle")
 	}
@@ -992,7 +1039,11 @@ func TestTUIView_Visual_NewVersionSequence(t *testing.T) {
 
 	// Receive new version message
 	newModel, _ := m.Update(newVersionAvailableMsg{latestVersion: "v3.0.0"})
-	m = newModel.(*Model)
+	var ok bool
+	m, ok = newModel.(*Model)
+	if !ok {
+		t.Fatal("expected *Model after newVersionAvailableMsg")
+	}
 
 	view = m.View()
 	if !strings.Contains(view.Content, "v3.0.0 available") {

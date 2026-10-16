@@ -478,6 +478,31 @@ func StopAllWorkstations(ctx context.Context, cfg *types.Config) error {
 	return errors.Join(errs...)
 }
 
+func StopWorkstationsForContexts(ctx context.Context, cfg *types.Config) error {
+	var errs []error
+	var stopped []string
+	currContext := cfg.CurrentContextName
+	defer func() { _ = cfg.SwitchContext(currContext, true) }()
+	for name, ctxCfg := range cfg.Contexts {
+		if ctxCfg == nil || !ctxCfg.StopWorkstationOnExitTunnel {
+			continue
+		}
+		if err := cfg.SwitchContext(name, true); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if err := StopWorkstationNow(ctx, cfg); err != nil {
+			errs = append(errs, err)
+		} else {
+			stopped = append(stopped, name)
+		}
+	}
+	if len(stopped) > 0 {
+		log.Logf("Stopped workstations: %s", stopped)
+	}
+	return errors.Join(errs...)
+}
+
 func StopAllWorkstationsNow(ctx context.Context, cfg *types.Config) error {
 	var errs []error
 	currContext := cfg.CurrentContextName

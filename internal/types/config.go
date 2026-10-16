@@ -55,8 +55,6 @@ type Config struct {
 	ChromeBrowser    *ChromeBrowserConfig `yaml:"chromeBrowser,omitempty"`
 	JetbrainsGateway *GatewayConfig       `yaml:"jetbrainsGateway,omitempty"`
 
-	StopWorkstationOnExitTunnel bool `yaml:"stopWorkstationOnExitTunnel,omitempty"`
-
 	AuthURLChan chan string `yaml:"-"`
 }
 
