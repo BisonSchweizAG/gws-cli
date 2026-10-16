@@ -25,11 +25,7 @@ func openWorkstationURL(ctx context.Context, cfg *types.Config) error {
 		return err
 	}
 
-	url = fmt.Sprintf("https://%d-%s", launchPort, url)
-
-	log.Logf("Opening workstation URL: %s", url)
-	gcloud.OpenBrowser(ctx, cfg, url)
-	log.Log("Workstation URL opened in browser")
+	openURL(ctx, cfg, "Workstation", fmt.Sprintf("https://%d-%s", launchPort, url))
 	return nil
 }
 
@@ -37,6 +33,7 @@ func openWorkstationURL(ctx context.Context, cfg *types.Config) error {
 var launchCmd = &cobra.Command{
 	Use:   "launch",
 	Short: "Open the default URL of the cloud workstation",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := readConfig(args...)
 		if err != nil {
