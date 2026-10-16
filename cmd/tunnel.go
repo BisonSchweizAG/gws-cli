@@ -77,11 +77,13 @@ var tunnelCmd = &cobra.Command{
 
 		_, err = p.Run()
 
-		// Stop workstations on exit for contexts where the flag is set.
-		// This ensures shutdown fires on any exit path (Ctrl+C, external close, SIGTERM, kill).
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_ = gcloud.StopWorkstationsForContexts(ctx, cfg)
-		cancel()
+		// Stop workstations on exit only if shutdown is still active.
+		// If the user selected "Don't Stop" in the confirmation prompt, ShutdownHookActive is false.
+		if m.ShutdownHookActive {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			_ = gcloud.StopWorkstationsForContexts(ctx, cfg)
+			cancel()
+		}
 
 		return err
 	},
