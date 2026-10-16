@@ -48,6 +48,9 @@ type Model struct {
 	// New version notification
 	NewVersionAvailable string
 
+	// Shutdown hook status
+	ShutdownHookActive bool
+
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
 
@@ -133,7 +136,7 @@ func (m *Model) Init() tea.Cmd {
 
 	// Listen for system shutdown signals if configured
 	if m.Config != nil && m.Config.TerminateOnShutdown {
-		log.Log("🪝 Shutdown hook enabled — will stop workstations on system shutdown")
+		m.ShutdownHookActive = true
 		cmds = append(cmds, m.waitForShutdown())
 	}
 
@@ -206,6 +209,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.Done {
 			return m, tea.Quit
+		}
+		if msg.String() == "t" && m.Config != nil {
+			m.Config.TerminateOnShutdown = !m.Config.TerminateOnShutdown
+			m.ShutdownHookActive = m.Config.TerminateOnShutdown
+			if err := m.Config.SaveConfig(); err != nil {
+				m.Logs = append(m.Logs, fmt.Sprintf("⚠ Failed to save config: %v", err))
+			}
+			if m.ShutdownHookActive {
+				m.Logs = append(m.Logs, "⚠ Shutdown hook enabled — workstations will stop on system shutdown")
+				cmds := []tea.Cmd{m.waitForShutdown(), m.waitForLog()}
+				return m, tea.Batch(cmds...)
+			}
+			m.Logs = append(m.Logs, "✓ Shutdown hook disabled")
+			cmd := m.waitForLog()
+			return m, cmd
 		}
 		if m.AuthURL != "" && msg.String() == "ctrl+y" {
 			_ = clipboard.WriteAll(m.AuthURL)
@@ -293,6 +311,9 @@ func (m *Model) View() tea.View {
 		)
 	}
 	fmt.Fprintf(&left, "  Version:     %s\n", versionLine)
+	if m.ShutdownHookActive {
+		fmt.Fprint(&left, "  ⚠ Shutdown Hook active\n")
+	}
 	if m.Config != nil && m.Config.FilePath != "" {
 		fmt.Fprintf(&left, "  Config File: %s\n", m.Config.FilePath)
 	}
@@ -417,7 +438,10 @@ func (m *Model) View() tea.View {
 	case m.Done:
 		help = m.Styles.RenderHelpBar([2]string{"Any key", "quit"})
 	default:
-		help = m.Styles.RenderHelpBar([2]string{"Ctrl+C", "quit"})
+		help = m.Styles.RenderHelpBar(
+			[2]string{"t", "toggle shutdown hook"},
+			[2]string{"Ctrl+C", "quit"},
+		)
 	}
 	b.WriteString(help)
 

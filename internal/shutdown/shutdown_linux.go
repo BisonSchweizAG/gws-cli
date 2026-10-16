@@ -21,22 +21,22 @@ const (
 // It holds a delay inhibitor lock with systemd-logind, so the shutdown is delayed
 // (up to logind's InhibitDelayMaxSec) until the returned ReleaseFunc is called.
 func WaitForShutdown() (ReleaseFunc, error) {
-	log("WaitForShutdown: starting Linux shutdown watcher (systemd-logind)")
+	logf("WaitForShutdown: starting Linux shutdown watcher (systemd-logind)")
 	// Use a private connection, closing the shared dbus.SystemBus() would break other users.
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
-		log("WaitForShutdown: failed to connect to system bus: %v", err)
+		logf("WaitForShutdown: failed to connect to system bus: %v", err)
 		return nil, fmt.Errorf("connect to system bus: %w", err)
 	}
 
 	release, err := waitForPowerOff(conn)
 	if err != nil {
 		_ = conn.Close()
-		log("WaitForShutdown: waitForPowerOff error: %v", err)
+		logf("WaitForShutdown: waitForPowerOff error: %v", err)
 		return nil, err
 	}
 	return sync.OnceFunc(func() {
-		log("WaitForShutdown: release function called")
+		logf("WaitForShutdown: release function called")
 		release()
 		_ = conn.Close()
 	}), nil
@@ -72,7 +72,7 @@ func waitForPowerOff(conn *dbus.Conn) (func(), error) {
 		}
 
 		if !active {
-			log("PrepareForShutdown: signal received, active=false (shutdown/reboot canceled)")
+			logf("PrepareForShutdown: signal received, active=false (shutdown/reboot canceled)")
 			// Shutdown/reboot was canceled: make sure we hold a lock for the next one.
 			if lock == nil {
 				if lock, err = inhibit(logind); err != nil {
@@ -83,14 +83,14 @@ func waitForPowerOff(conn *dbus.Conn) (func(), error) {
 		}
 
 		st := shutdownType(logind)
-		log("PrepareForShutdown: signal received, active=true, shutdownType=%q, isPowerOff=%v", st, isPowerOff(st))
+		logf("PrepareForShutdown: signal received, active=true, shutdownType=%q, isPowerOff=%v", st, isPowerOff(st))
 		if isPowerOff(st) {
-			log("PrepareForShutdown: triggering shutdown hook — power off detected")
+			logf("PrepareForShutdown: triggering shutdown hook — power off detected")
 			return func() { _ = lock.Close() }, nil
 		}
 
 		// Reboot (or similar): do not delay it.
-		log("PrepareForShutdown: ignoring — reboot detected (shutdownType=%q)", st)
+		logf("PrepareForShutdown: ignoring — reboot detected (shutdownType=%q)", st)
 		if lock != nil {
 			_ = lock.Close()
 			lock = nil

@@ -1,6 +1,7 @@
 package shutdown
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,14 +17,14 @@ var (
 	logMu       sync.Mutex
 )
 
-// logFile returns the shared shutdown log file, creating it on first use.
+// logFile returns the shared shutdown logf file, creating it on first use.
 func getLogFile() (*os.File, error) {
 	var err error
 	logFileOnce.Do(func() {
 		_, configDir, _ := types.DefaultConfigPaths()
 		if configDir == "" {
 			logFile = nil
-			err = fmt.Errorf("config dir not available")
+			err = errors.New("config dir not available")
 			return
 		}
 		if err = os.MkdirAll(configDir, 0o755); err != nil {
@@ -36,9 +37,9 @@ func getLogFile() (*os.File, error) {
 	return logFile, err
 }
 
-// log writes a timestamped line to the shared shutdown log file.
+// logf writes a timestamped line to the shared shutdown logf file.
 // It is safe to call from any goroutine.
-func log(format string, args ...interface{}) {
+func logf(format string, args ...any) {
 	f, err := getLogFile()
 	if err != nil || f == nil {
 		return
