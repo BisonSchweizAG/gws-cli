@@ -150,6 +150,16 @@ gws launch -p 8080
 |--------------|---------------------------------------------|
 | `-p, --port` | The workstation port to use (default: `80`) |
 
+#### `gws dashboard [context]`
+
+Open the Google Cloud workstations dashboard of the context's project in your browser.
+
+```bash
+gws dashboard
+gws dashboard my-workstation
+gws dashboard --ctx my-workstation
+```
+
 #### `gws up`
 
 Upload files and directories to the workstation as defined in the context configuration.

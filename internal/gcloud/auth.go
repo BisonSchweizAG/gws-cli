@@ -276,7 +276,7 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 
 	// Open URL in browser
 	log.Log("Opening browser for authentication...")
-	OpenBrowser(ctx, cfg, authURL)
+	openBrowser(ctx, cfg, authURL)
 
 	shutdownChan := make(chan authResult, 1)
 
@@ -353,6 +353,10 @@ func Login(ctx context.Context, cfg *types.Config) (oauth2.TokenSource, error) {
 
 	return newTokenSourceWithRefreshCheck(ctx, res.token, cfg, &localOAuth), nil
 }
+
+// openBrowser opens the given URL in the default browser.
+// It is a variable to allow replacing it in tests.
+var openBrowser = OpenBrowser
 
 func callbackHTML() string {
 	return fmt.Sprintf(callbackPage, icon.IconSVG)

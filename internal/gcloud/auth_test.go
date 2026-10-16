@@ -33,6 +33,11 @@ func TestCallbackHTML(t *testing.T) {
 }
 
 func TestLogin_Browser_AuthURL(t *testing.T) {
+	// Make sure no real browser is opened during the test.
+	origOpenBrowser := openBrowser
+	openBrowser = func(_ context.Context, _ *types.Config, _ string) {}
+	defer func() { openBrowser = origOpenBrowser }()
+
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
