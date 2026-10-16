@@ -15,6 +15,7 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
 	"github.com/bisonschweizag/gws-cli/internal/spinner"
+	"github.com/bisonschweizag/gws-cli/internal/types"
 )
 
 // statusCmd represents the status command.
@@ -63,7 +64,7 @@ var statusCmd = &cobra.Command{
 		}
 		rows := make([]table.Row, 0, len(states))
 		for _, s := range states {
-			contextName := formatContext(s.Context, cfg.CurrentContextName)
+			contextName := formatContext(s.Context, cfg.CurrentContextName, cfg.Contexts)
 			shutdown := formatTime(s.ExpectedShutdown)
 			if s.RunningTimeout == nil || *s.RunningTimeout == 0 {
 				shutdown = ""
@@ -91,7 +92,7 @@ var statusCmd = &cobra.Command{
 		if transpose {
 			contextNames := make([]string, len(states))
 			for i, s := range states {
-				contextNames[i] = formatContext(s.Context, cfg.CurrentContextName)
+				contextNames[i] = formatContext(s.Context, cfg.CurrentContextName, cfg.Contexts)
 			}
 			// Drop the CONTEXT column since it becomes the header in transposed mode.
 			noContextHeader := header[1:]
@@ -147,11 +148,17 @@ func transposeTable(header table.Row, rows []table.Row, names []string) (table.R
 	return newHeader, newRows
 }
 
-func formatContext(name, current string) string {
-	if current != "" && name == current {
-		return name + " ✅"
+func formatContext(name, current string, contexts map[string]*types.Context) string {
+	var sb strings.Builder
+	if ctx, ok := contexts[name]; ok {
+		sb.WriteString(ctx.FormatName(name))
+	} else {
+		sb.WriteString(name)
 	}
-	return name
+	if current != "" && name == current {
+		sb.WriteString(" ✅")
+	}
+	return sb.String()
 }
 
 func formatState(s workstationState) string {

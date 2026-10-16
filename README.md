@@ -243,6 +243,7 @@ contexts:
     host: localhost
     port: 2222
     user: user
+    icon: 🏠
     privateKeyFile: /path/to/your/private/key
     knownHostsFile: /path/to/your/known_hosts
     postConnectCommand: # open 'GWS' profile in a new Windows Terminal Tab
@@ -279,6 +280,7 @@ jetbrainsGateway:
         - `host`: The hostname or IP address of the workstation.
         - `port`: The port to connect to.
         - `user`: The username to use for the SSH connection.
+        - `icon`: Optional emoji displayed before the context name in the TUI and status output.
         - `privateKeyFile`: The path to the private key for the SSH connection.
         - `knownHostsFile`: The path to the known hosts file for the SSH connection.
         - `postConnectCommand`: Optional command and arguments to start after the tunnel is opened. The first item is

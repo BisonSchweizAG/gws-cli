@@ -51,7 +51,10 @@ func init() {
 }
 
 func selectContext(cfg *types.Config) (string, error) {
-	m := &ctxModel{choices: slices.Sorted(maps.Keys(cfg.Contexts))}
+	m := &ctxModel{
+		choices: slices.Sorted(maps.Keys(cfg.Contexts)),
+		ctxs:    cfg.Contexts,
+	}
 	m.cursor = slices.Index(m.choices, cfg.CurrentContextName)
 
 	p := tea.NewProgram(m)
@@ -69,6 +72,7 @@ func init() {
 type ctxModel struct {
 	cursor   int
 	choices  []string
+	ctxs     map[string]*types.Context
 	selected string
 }
 
@@ -106,7 +110,12 @@ func (m *ctxModel) View() tea.View {
 		if m.cursor == i {
 			cursor = ">"
 		}
-		fmt.Fprintf(&sb, "%s %s\n", cursor, choice)
+		ctx := m.ctxs[choice]
+		displayName := choice
+		if ctx != nil {
+			displayName = ctx.FormatName(choice)
+		}
+		fmt.Fprintf(&sb, "%s %s\n", cursor, displayName)
 	}
 	s += sb.String()
 	s += "\nPress ↑/↓ to move, Enter to select, Q to quit.\n"
