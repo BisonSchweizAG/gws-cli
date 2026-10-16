@@ -50,6 +50,10 @@ type Model struct {
 	ShutdownHookEnabled bool
 	ShutdownHookActive  bool
 
+	// Shutdown confirmation prompt
+	ShutdownConfirming bool
+	ShutdownConfirmRem int // remaining seconds
+
 	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
 
@@ -101,7 +105,10 @@ type (
 	errMsg                 struct{ err error }
 	opDoneMsg              struct{}
 	newVersionAvailableMsg struct{ latestVersion string }
+	shutdownConfirmTickMsg struct{}
 )
+
+const shutdownConfirmTimeout = 15 * time.Second
 
 func (m *Model) Init() tea.Cmd {
 	log.SetLogger(func(l string) {
@@ -187,9 +194,32 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
+			// If shutdown is active, show confirmation prompt instead of quitting immediately
+			if m.ShutdownHookEnabled && m.ShutdownHookActive && !m.ShutdownConfirming {
+				m.ShutdownConfirming = true
+				m.ShutdownConfirmRem = int(shutdownConfirmTimeout.Seconds())
+				cmd := shutdownConfirmTickCmd()
+				return m, cmd
+			}
 			m.Quitting = true
 			m.cancel()
 			return m, tea.Quit
+		}
+		if m.ShutdownConfirming {
+			if msg.String() == "y" || msg.String() == "Y" {
+				// Confirm shutdown
+				m.ShutdownConfirming = false
+				m.Quitting = true
+				m.cancel()
+				return m, tea.Quit
+			}
+			if msg.String() == "n" || msg.String() == "N" {
+				// Cancel shutdown, go back to normal
+				m.ShutdownConfirming = false
+				m.ShutdownConfirmRem = 0
+				return m, nil
+			}
+			return m, nil
 		}
 		if m.Done {
 			return m, tea.Quit
@@ -255,8 +285,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.Spinner, cmd = m.Spinner.Update(msg)
 		return m, cmd
+	case shutdownConfirmTickMsg:
+		if !m.ShutdownConfirming {
+			return m, nil
+		}
+		m.ShutdownConfirmRem--
+		if m.ShutdownConfirmRem <= 0 {
+			// Timeout — proceed with shutdown (default Yes)
+			m.ShutdownConfirming = false
+			m.Quitting = true
+			m.cancel()
+			return m, tea.Quit
+		}
+		return m, shutdownConfirmTickCmd()
 	}
 	return m, nil
+}
+
+func shutdownConfirmTickCmd() tea.Cmd {
+	return tea.Tick(1*time.Second, func(time.Time) tea.Msg {
+		return shutdownConfirmTickMsg{}
+	})
 }
 
 func (m *Model) View() tea.View {
@@ -407,8 +456,30 @@ func (m *Model) View() tea.View {
 	}
 	b.WriteString("\n\n")
 
+	// Shutdown confirmation prompt overlay
+	if m.ShutdownConfirming {
+		var confirmCard strings.Builder
+		confirmCard.WriteString(m.Styles.Badge.Background(Amber).Render(" ⚠ CONFIRM SHUTDOWN "))
+		confirmCard.WriteString("\n\n")
+		confirmCard.WriteString("Stop workstation on exit?")
+		confirmCard.WriteString("\n\n")
+		confirmCard.WriteString(fmt.Sprintf("  Auto-confirm in %d seconds...", m.ShutdownConfirmRem))
+		confirmCard.WriteString("\n\n")
+		yesKey := m.Styles.HelpKey.Render("Y")
+		yesDesc := m.Styles.Success.Render("es (default)")
+		noKey := m.Styles.HelpKey.Render("N")
+		noDesc := m.Styles.Help.Render("o (cancel)")
+		confirmCard.WriteString("  " + yesKey + " " + yesDesc + "    " + noKey + " " + noDesc)
+		confirmCard.WriteString("\n")
+		confirmCardRendered := m.Styles.Card.Width(innerWidth).Render(confirmCard.String())
+		b.WriteString(confirmCardRendered)
+		b.WriteString("\n\n")
+	}
+
 	var help string
 	switch {
+	case m.ShutdownConfirming:
+		help = ""
 	case m.AuthURL != "":
 		help = m.Styles.RenderHelpBar(
 			[2]string{"Ctrl+Y", "copy URL"},
@@ -417,10 +488,14 @@ func (m *Model) View() tea.View {
 	case m.Done:
 		help = m.Styles.RenderHelpBar([2]string{"Any key", "quit"})
 	default:
-		help = m.Styles.RenderHelpBar(
-			[2]string{"s", "toggle stop on exit"},
-			[2]string{"Ctrl+C", "quit"},
-		)
+		if m.ShutdownHookEnabled {
+			help = m.Styles.RenderHelpBar(
+				[2]string{"s", "toggle stop on exit"},
+				[2]string{"Ctrl+C", "quit"},
+			)
+		} else {
+			help = m.Styles.RenderHelpBar([2]string{"Ctrl+C", "quit"})
+		}
 	}
 	b.WriteString(help)
 
