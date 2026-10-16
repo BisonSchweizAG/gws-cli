@@ -63,41 +63,66 @@ func Test_parseWorkstationName(t *testing.T) {
 
 func Test_listWorkstationSorting(t *testing.T) {
 	now := time.Now()
-	startTime1 := timestamppb.New(now.Add(-1 * time.Hour)).AsTime()
-	startTime2 := timestamppb.New(now.Add(-2 * time.Hour)).AsTime()
+	// Different last started dates (different days for compareDate which truncates to date)
+	startTime1 := timestamppb.New(now.Add(-1 * 24 * time.Hour)).AsTime() // yesterday
+	startTime2 := timestamppb.New(now.Add(-3 * 24 * time.Hour)).AsTime() // 2 days ago
+	// Same last started, different created dates
+	createdDate1 := timestamppb.New(now.Add(-1 * 24 * time.Hour)).AsTime() // yesterday
+	createdDate2 := timestamppb.New(now.Add(-3 * 24 * time.Hour)).AsTime() // 2 days ago
 
 	workstations := []gcloud.ProjectWorkstation{
 		{
-			Config:      "config-1",
-			Name:        "ws-1",
+			Name:        "ws-z",
 			State:       workstationspb.Workstation_STATE_RUNNING,
 			LastStarted: &startTime1,
+			CreatedDate: &createdDate1,
 		},
 		{
-			Config:      "config-2",
-			Name:        "ws-2",
+			Name:        "ws-a",
 			State:       workstationspb.Workstation_STATE_STOPPED,
 			LastStarted: &startTime2,
+			CreatedDate: &createdDate2,
 		},
 		{
-			Config:      "config-1",
-			Name:        "ws-3",
+			Name:        "ws-m",
 			State:       workstationspb.Workstation_STATE_STARTING,
 			LastStarted: &startTime1,
+			CreatedDate: &createdDate2,
+		},
+		{
+			Name:        "ws-b",
+			State:       workstationspb.Workstation_STATE_RUNNING,
+			LastStarted: &startTime1,
+			CreatedDate: &createdDate1,
 		},
 	}
 
-	// Verify sorting by name (default)
-	expectedOrder := []string{"ws-1", "ws-2", "ws-3"}
+	// Verify default sorting: last-started (newest first) → created (newest first) → name (alphabetical)
+	// ws-z and ws-b have same lastStarted (startTime1, newest) and same createdDate (createdDate1, newest)
+	// Among them, ws-b comes before ws-z alphabetically
+	// ws-m has same lastStarted (startTime1) but older createdDate (createdDate2)
+	// ws-a has oldest lastStarted (startTime2)
+	expectedOrder := []string{"ws-b", "ws-z", "ws-m", "ws-a"}
 
 	// After sorting, check the order
 	sorted := make([]gcloud.ProjectWorkstation, len(workstations))
 	copy(sorted, workstations)
 
-	// Simulate the name sort from list.go
+	// Simulate the default sort from list.go: last-started → created → name
 	for i := range len(sorted) - 1 {
 		for j := i + 1; j < len(sorted); j++ {
-			if sorted[i].Name > sorted[j].Name {
+			cmp := compareDate(sorted[i].LastStarted, sorted[j].LastStarted)
+			if cmp == 0 {
+				cmp = compareDate(sorted[i].CreatedDate, sorted[j].CreatedDate)
+			}
+			if cmp == 0 {
+				if sorted[i].Name > sorted[j].Name {
+					cmp = 1
+				} else if sorted[i].Name < sorted[j].Name {
+					cmp = -1
+				}
+			}
+			if cmp > 0 {
 				sorted[i], sorted[j] = sorted[j], sorted[i]
 			}
 		}
