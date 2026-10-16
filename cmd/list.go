@@ -100,11 +100,14 @@ var listCmd = &cobra.Command{
 				return strings.Compare(a.Config, b.Config)
 			case "state":
 				return int(a.State) - int(b.State)
-			default:
-				if cmp := compareDate(a.LastStarted, b.LastStarted); cmp != 0 {
-					return cmp
-				}
-				return strings.Compare(a.Name, b.Name)
+ 		default:
+ 			if cmp := compareDate(a.LastStarted, b.LastStarted); cmp != 0 {
+ 				return cmp
+ 			}
+ 			if cmp := compareDate(a.CreatedDate, b.CreatedDate); cmp != 0 {
+ 				return cmp
+ 			}
+ 			return strings.Compare(a.Name, b.Name)
 			}
 		})
 
