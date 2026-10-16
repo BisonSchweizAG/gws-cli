@@ -231,16 +231,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Quitting = true
 					m.cancel()
 					return m, tea.Quit
-				} else {
-					// No — exit TUI without stopping the workstation
+ 			} else {
+					// Don't Stop — exit TUI without stopping the workstation this time
 					m.ShutdownConfirming = false
 					m.ShutdownHookActive = false
-					if m.Config != nil {
-						if currCtx := m.Config.CurrentContext(); currCtx != nil {
-							currCtx.StopWorkstationOnExitTunnel = false
-							_ = m.Config.SaveConfig()
-						}
-					}
 					m.Quitting = true
 					m.cancel()
 					return m, tea.Quit
@@ -256,15 +250,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			if msg.String() == "n" || msg.String() == "N" {
-				// Cancel shutdown — exit TUI without stopping the workstation
+				// Don't Stop — exit TUI without stopping the workstation this time
 				m.ShutdownConfirming = false
 				m.ShutdownHookActive = false
-				if m.Config != nil {
-					if currCtx := m.Config.CurrentContext(); currCtx != nil {
-						currCtx.StopWorkstationOnExitTunnel = false
-						_ = m.Config.SaveConfig()
-					}
-				}
 				m.Quitting = true
 				m.cancel()
 				return m, tea.Quit
@@ -517,18 +505,18 @@ func (m *Model) View() tea.View {
 		fmt.Fprintf(&confirmCard, "  Auto-confirm in %d seconds...", m.ShutdownConfirmRem)
 		confirmCard.WriteString("\n\n")
 
-		// Build Yes/No buttons with focus highlighting
-		var yesBtn, noBtn string
+		// Build Stop/Don't Stop buttons with focus highlighting
+		var stopBtn, dontStopBtn string
 		if m.ShutdownConfirmSelected == 0 {
-			// Yes is selected
-			yesBtn = m.Styles.Badge.Background(Green).Render("  Yes  ")
-			noBtn = m.Styles.Help.Render(" [No] ")
+			// Stop is selected
+			stopBtn = m.Styles.Badge.Background(Green).Render("  Stop  ")
+			dontStopBtn = m.Styles.Help.Render(" [Don't Stop] ")
 		} else {
-			// No is selected
-			yesBtn = m.Styles.Help.Render(" [Yes] ")
-			noBtn = m.Styles.Badge.Background(HotPink).Render("  No  ")
+			// Don't Stop is selected
+			stopBtn = m.Styles.Help.Render(" [Stop] ")
+			dontStopBtn = m.Styles.Badge.Background(HotPink).Render(" Don't Stop ")
 		}
-		confirmCard.WriteString("  " + yesBtn + "    " + noBtn)
+		confirmCard.WriteString("  " + stopBtn + "    " + dontStopBtn)
 		confirmCard.WriteString("\n\n")
 		confirmCard.WriteString(m.Styles.Help.Render("  Arrow keys: navigate  Enter: select  Esc: cancel"))
 		confirmCard.WriteString("\n")
