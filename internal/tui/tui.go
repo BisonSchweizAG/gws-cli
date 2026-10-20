@@ -359,8 +359,8 @@ func (m *Model) View() tea.View {
 	title := m.Styles.Title.Render(m.Title)
 	var titleRow string
 	if m.ShutdownHookEnabled && m.ShutdownHookActive {
-		shutdownBadge := m.Styles.ShutdownHook.Render("⚡ Stop WS on exit ⚡")
-		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title, "  ", shutdownBadge)
+		shutdown := m.Styles.ShutdownHook.Render("⚡ Stop WS on exit ⚡")
+		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title, "  ", shutdown)
 	} else {
 		titleRow = lipgloss.JoinHorizontal(lipgloss.Center, badge, " ", title)
 	}
@@ -460,21 +460,12 @@ func (m *Model) View() tea.View {
 
 	if len(m.Logs) > 0 {
 		start := 0
-		// Count the fixed header lines: title(1) + blank(1) + version(1) + config(1) +
-		// context(1) + workstation(1) + headers(N) = 7+N. The logo is 9 lines.
-		// Header height = max(7+N, 9). Then: newline(1) + divider(1) + blank(2) +
-		// logs header(1) + newline(1) + blank after logs(2) + help bar(1) = 9.
-		// Border vertical frame = Padding(1,2) + RoundedBorder = 4.
-		headerLines := max(7+len(m.Headers), 9)
-		reservedHeight := headerLines + 9 + 4
+		reservedHeight := max(10, 7+len(m.Headers)) + 8
 		if m.AuthURL != "" {
 			reservedHeight += 11
 		}
 		if m.Err != nil {
 			reservedHeight += 2
-		}
-		if m.ShutdownConfirming {
-			reservedHeight += 12
 		}
 		availableHeight := max(m.Height-reservedHeight, 4)
 
