@@ -46,6 +46,7 @@ var listCmd = &cobra.Command{
 		wide := output == "wide"
 		sortBy, _ := cmd.Flags().GetString("sort")
 		filter, _ := cmd.Flags().GetString("filter")
+		neverStarted, _ := cmd.Flags().GetBool("never-started")
 
 		validSorts := []string{"name", "user", "project", "config", "state", "last-started"}
 		if !slices.Contains(validSorts, sortBy) {
@@ -82,6 +83,17 @@ var listCmd = &cobra.Command{
 				case workstationspb.Workstation_STATE_RUNNING,
 					workstationspb.Workstation_STATE_STARTING,
 					workstationspb.Workstation_STATE_STOPPING:
+					filtered = append(filtered, ws)
+				}
+			}
+			workstations = filtered
+		}
+
+		// Filter by never started (LastStarted is nil or zero)
+		if neverStarted {
+			filtered := make([]gcloud.ProjectWorkstation, 0, len(workstations))
+			for _, ws := range workstations {
+				if ws.LastStarted == nil || ws.LastStarted.IsZero() {
 					filtered = append(filtered, ws)
 				}
 			}
@@ -202,4 +214,5 @@ func init() {
 	listCmd.Flags().StringP("sort", "s", "last-started", "Sort by column: name, user, project, config, state, last-started")
 	listCmd.Flags().StringP("filter", "f", "", "Filter workstations by name or user (case-insensitive)")
 	listCmd.Flags().BoolP("running", "r", false, "Show only running workstations")
+	listCmd.Flags().BoolP("never-started", "n", false, "Show only workstations that have never been started")
 }
