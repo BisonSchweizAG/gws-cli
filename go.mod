@@ -9,7 +9,7 @@ require (
 	cloud.google.com/go/workstations v1.10.1
 	github.com/atotto/clipboard v0.1.4
 	github.com/bramvdbogaerde/go-scp v1.6.1
-	github.com/go-playground/validator/v10 v10.30.5
+	github.com/go-playground/validator/v10 v10.30.6
 	github.com/gorilla/websocket v1.5.3
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5
@@ -46,10 +46,10 @@ require (
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.16 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/locales v0.14.2 // indirect
 	github.com/go-playground/universal-translator v0.18.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.4 // indirect
 	github.com/google/s2a-go v0.1.11 // indirect
