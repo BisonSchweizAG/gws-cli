@@ -58,6 +58,7 @@ func TestScriptsReconnectCmd_WindowsPath(t *testing.T) {
 			},
 			"💾 Writing SSH reconnect script for context %q on Windows to %s\n",
 			0o644,
+			defaultConfigDir,
 		)
 		if err != nil {
 			t.Fatalf("runReconnectScript error = %v", err)

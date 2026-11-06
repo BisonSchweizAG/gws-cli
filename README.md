@@ -222,6 +222,32 @@ gws scripts bash-reconnect-ssh -o ./reconnect.sh
 | `-o, --output` | Output file (default: stdout)                  |
 | `-s, --save`   | Save the script to the default config location |
 
+#### `gws scripts ssh-config [context]`
+
+Generate an SSH config entry for the current workstation, or the selected context.
+
+```bash
+gws scripts ssh-config
+gws scripts ssh-config -gws scripts ssh-config -o ~/.ssh/config.d/gws-my-context
+gws scripts ssh-config -s --update-ssh-config
+```
+
+| Flag                  | Description                                                    |
+|-----------------------|----------------------------------------------------------------|
+| `-o, --output`        | Output file (default: stdout)                                   |
+| `-s, --save`          | Save the snippet to `~/.ssh/config.d`                           |
+| `-u, --update-ssh-config` | Add `Include config.d/*` to `~/.ssh/config` if it is missing |
+| `-a, --forward-agent` | Add `ForwardAgent yes` to the generated snippet                 |
+| `-n, --name`          | Host name of the generated snippet (default: context name)      |
+
+The generated snippet is written to stdout by default. With `-s` the file is saved as `gws-<context>` in
+`~/.ssh/config.d`. Files created with `-o` or `-s` use permissions `0600`.
+
+For snippets in `~/.ssh/config.d` to be picked up by `ssh`, the main `~/.ssh/config` must include that directory. The
+command never changes `~/.ssh/config` on its own: if the include is missing, a warning is printed. Use
+`--update-ssh-config` to prepend `Include config.d/*` to `~/.ssh/config`. An already present include of a `config.d`
+directory is left untouched.
+
 #### `gws login`
 
 Authenticate with Google Cloud using a simple text-based flow. This command prints an authorization URL to the terminal and waits for you to paste the authorization code. It does not require a browser or TUI, making it suitable for Termux and other headless environments.

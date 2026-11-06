@@ -26,19 +26,33 @@ func UnixReconnectSSH(cfg *types.Config, fileName string) (name string, content 
 }
 
 func render(script string, cfg *types.Config, fileName, fileExt string) (name string, content []byte, err error) {
+	return renderNamed(script, cfg, fileName, "gws-ssh-with-reconnect", fileExt)
+}
+
+func renderNamed(
+	script string,
+	cfg *types.Config,
+	fileName, filePrefix, fileExt string,
+	opts ...func(*NamedContext),
+) (name string, content []byte, err error) {
 	tmpl, err := template.New("reconnect").Parse(script)
 	if err != nil {
 		return "", nil, err
 	}
 
 	if fileName == "" {
-		fileName = fmt.Sprintf("gws-ssh-with-reconnect-%s.%s", cfg.CurrentContextName, fileExt)
+		fileName = fmt.Sprintf("%s-%s.%s", filePrefix, cfg.CurrentContextName, fileExt)
 	}
 
 	name = outFileName(fileName)
 
+	namedCtx := &NamedContext{Name: cfg.CurrentContextName, FileName: name, Context: *cfg.CurrentContext()}
+	for _, opt := range opts {
+		opt(namedCtx)
+	}
+
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, &NamedContext{Name: cfg.CurrentContextName, FileName: name, Context: *cfg.CurrentContext()})
+	err = tmpl.Execute(&buf, namedCtx)
 	if err != nil {
 		return "", nil, err
 	}
@@ -55,6 +69,7 @@ func outFileName(name string) string {
 
 type NamedContext struct {
 	types.Context
-	Name     string
-	FileName string
+	Name         string
+	FileName     string
+	ForwardAgent bool
 }
