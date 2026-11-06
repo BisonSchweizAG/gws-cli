@@ -222,6 +222,19 @@ gws scripts bash-reconnect-ssh -o ./reconnect.sh
 | `-o, --output` | Output file (default: stdout)                  |
 | `-s, --save`   | Save the script to the default config location |
 
+#### `gws scripts ssh-config [context]`
+
+Generate an SSH config entry for the current workstation, or the selected context.
+
+```bash
+gws scripts ssh-config
+gws scripts ssh-config -s
+gws scripts ssh-config -o ~/.ssh/config.d/gws-my-context-name
+```
+
+The generated snippet is written to stdout by default. With `-s` the file is saved as `gws-ssh-config-<context>` in the
+default config location. Files created with `-o` or `-s` use permissions `0600`.
+
 #### `gws login`
 
 Authenticate with Google Cloud using a simple text-based flow. This command prints an authorization URL to the terminal and waits for you to paste the authorization code. It does not require a browser or TUI, making it suitable for Termux and other headless environments.

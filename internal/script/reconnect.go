@@ -26,13 +26,21 @@ func UnixReconnectSSH(cfg *types.Config, fileName string) (name string, content 
 }
 
 func render(script string, cfg *types.Config, fileName, fileExt string) (name string, content []byte, err error) {
+	return renderNamed(script, cfg, fileName, "gws-ssh-with-reconnect", fileExt)
+}
+
+func renderNamed(
+	script string,
+	cfg *types.Config,
+	fileName, filePrefix, fileExt string,
+) (name string, content []byte, err error) {
 	tmpl, err := template.New("reconnect").Parse(script)
 	if err != nil {
 		return "", nil, err
 	}
 
 	if fileName == "" {
-		fileName = fmt.Sprintf("gws-ssh-with-reconnect-%s.%s", cfg.CurrentContextName, fileExt)
+		fileName = fmt.Sprintf("%s-%s.%s", filePrefix, cfg.CurrentContextName, fileExt)
 	}
 
 	name = outFileName(fileName)

@@ -28,6 +28,7 @@ func init() {
 		BoolVarP(&flagSaveToDefault, "save", "s", false, "Save the script to the default config location")
 	scriptsCmd.AddCommand(scriptsWinReconnectCmd)
 	scriptsCmd.AddCommand(scriptsUnixReconnectCmd)
+	scriptsCmd.AddCommand(scriptsSSHConfigCmd)
 }
 
 func runReconnectScript(
@@ -91,6 +92,20 @@ var scriptsUnixReconnectCmd = &cobra.Command{
 			script.UnixReconnectSSH,
 			"💾 Writing SSH bash reconnect script for context %q to %s\n",
 			0o755,
+		)
+	},
+}
+
+var scriptsSSHConfigCmd = &cobra.Command{
+	Use:   "ssh-config",
+	Short: "Generate SSH config for the current workstation",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runReconnectScript(
+			cmd,
+			args,
+			script.SSHConfig,
+			"💾 Writing SSH config for context %q to %s\n",
+			0o600,
 		)
 	},
 }
