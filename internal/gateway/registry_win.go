@@ -13,7 +13,7 @@ import (
 
 const (
 	keyJetBrainsClient       = `SOFTWARE\JetBrains\JetBrainsClient`
-	fullKey                  = `HKEY_CURRENT_USERS\` + keyJetBrainsClient
+	fullKey                  = `HKEY_CURRENT_USER\` + keyJetBrainsClient
 	valueDownloadDestination = "downloadDestination"
 )
 
@@ -29,7 +29,7 @@ func UpdateDownloadLocation(ctx context.Context, cfg *types.Config) error {
 		}
 
 		// Key doesn't exist, so create it.
-		log.Logf("Creating registry key %q", fullKey)
+		log.Logf(`Creating registry key "%s"`, fullKey)
 		key, _, err = registry.CreateKey(registry.CURRENT_USER, keyJetBrainsClient, registry.QUERY_VALUE|registry.SET_VALUE)
 		if err != nil {
 			return fmt.Errorf("create JetBrains registry key: %w", err)
@@ -45,15 +45,15 @@ func UpdateDownloadLocation(ctx context.Context, cfg *types.Config) error {
 
 	// Already configured correctly; don't write anything.
 	if err == nil && current == cfg.JetbrainsGateway.DownloadDestination {
-		log.Logf("JetbrainsGateway DownloadDestination is correctly set in %q", fullKey)
+		log.Logf(`JetbrainsGateway DownloadDestination is correctly set in "%s"`, fullKey)
 		return nil
 	}
 
 	// Value is missing or different, so update it.
 	if current == "" {
-		log.Logf("Creating JetbrainsGateway DownloadDestination registry entry %q in %q", cfg.JetbrainsGateway.DownloadDestination, fullKey)
+		log.Logf(`Creating JetbrainsGateway DownloadDestination registry entry "%s" in "%s"`, cfg.JetbrainsGateway.DownloadDestination, fullKey)
 	} else {
-		log.Logf("Updating JetbrainsGateway DownloadDestination registry entry from %q to %q in %q", current, cfg.JetbrainsGateway.DownloadDestination, fullKey)
+		log.Logf(`Updating JetbrainsGateway DownloadDestination registry entry from "%s" to "%s" in "%s"`, current, cfg.JetbrainsGateway.DownloadDestination, fullKey)
 	}
 	if err := key.SetStringValue(valueDownloadDestination, cfg.JetbrainsGateway.DownloadDestination); err != nil {
 		return fmt.Errorf("set %s: %w", valueDownloadDestination, err)
