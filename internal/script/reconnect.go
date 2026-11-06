@@ -33,6 +33,7 @@ func renderNamed(
 	script string,
 	cfg *types.Config,
 	fileName, filePrefix, fileExt string,
+	opts ...func(*NamedContext),
 ) (name string, content []byte, err error) {
 	tmpl, err := template.New("reconnect").Parse(script)
 	if err != nil {
@@ -45,8 +46,13 @@ func renderNamed(
 
 	name = outFileName(fileName)
 
+	namedCtx := &NamedContext{Name: cfg.CurrentContextName, FileName: name, Context: *cfg.CurrentContext()}
+	for _, opt := range opts {
+		opt(namedCtx)
+	}
+
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, &NamedContext{Name: cfg.CurrentContextName, FileName: name, Context: *cfg.CurrentContext()})
+	err = tmpl.Execute(&buf, namedCtx)
 	if err != nil {
 		return "", nil, err
 	}
@@ -63,6 +69,7 @@ func outFileName(name string) string {
 
 type NamedContext struct {
 	types.Context
-	Name     string
-	FileName string
+	Name         string
+	FileName     string
+	ForwardAgent bool
 }

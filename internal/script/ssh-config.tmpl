@@ -5,6 +5,9 @@ Host {{.Name}}
 {{end}}{{if .PrivateKeyFile}}  IdentityFile {{.PrivateKeyFile}}
 {{end}}{{if .KnownHostsFile}}  UserKnownHostsFile {{.KnownHostsFile}}
 {{- end}}
+{{- if .ForwardAgent}}
+  ForwardAgent yes
+{{- end}}
   Compression yes
   TCPKeepAlive yes
   ServerAliveInterval 60
