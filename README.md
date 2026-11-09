@@ -90,12 +90,12 @@ List all configured workstations with their current state. Alias: `st`.
 ```bash
 gws status
 gws status -o wide
-gws status -o transpose
+gws status -o detail
 ```
 
 | Flag           | Description                          |
 |----------------|--------------------------------------|
-| `-o, --output` | Output format: `wide` or `transpose` |
+| `-o, --output` | Output format: `wide` or `detail` |
 
 #### `gws list`
 

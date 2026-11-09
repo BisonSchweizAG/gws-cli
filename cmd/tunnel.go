@@ -57,6 +57,7 @@ var tunnelCmd = &cobra.Command{
 			return gcloud.TCPTunnelWithPassphrase(ctx, cfg, flagLocalPort)
 		})
 
+		m.BoostConfig = flagBoostConfig
 		m.AddHeader("SSH User", m.Styles.SSH.Render(cfg.CurrentContext().User))
 		m.AddHeader("SSH Host", m.Styles.SSH.Render(cfg.CurrentContext().Host))
 		port := flagLocalPort

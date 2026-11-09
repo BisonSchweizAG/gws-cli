@@ -30,6 +30,7 @@ var (
 				return gcloud.StartWorkstation(ctx, cfg, flagBoostConfig)
 			})
 			m.AutoQuit = true
+			m.BoostConfig = flagBoostConfig
 
 			p := tea.NewProgram(m)
 			resModel, err := p.Run()

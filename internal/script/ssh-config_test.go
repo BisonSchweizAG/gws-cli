@@ -150,11 +150,11 @@ func TestHasSSHConfigInclude(t *testing.T) {
 		},
 		{
 			name:     "Existing config without include",
-			existing: ptr("Host example\n  HostName example.com\n"),
+			existing: new("Host example\n  HostName example.com\n"),
 		},
 		{
 			name:        "Existing include",
-			existing:    ptr("include ~/.ssh/config.d/*\n\nHost example\n"),
+			existing:    new("include ~/.ssh/config.d/*\n\nHost example\n"),
 			wantPresent: true,
 		},
 	}
@@ -215,13 +215,13 @@ func TestAddSSHConfigInclude(t *testing.T) {
 		},
 		{
 			name:      "Existing config without include",
-			existing:  ptr("Host example\n  HostName example.com\n"),
+			existing:  new("Host example\n  HostName example.com\n"),
 			wantAdded: true,
 			want:      "Include config.d/*\n\nHost example\n  HostName example.com\n",
 		},
 		{
 			name:      "Existing include",
-			existing:  ptr("include ~/.ssh/config.d/*\n\nHost example\n"),
+			existing:  new("include ~/.ssh/config.d/*\n\nHost example\n"),
 			wantAdded: false,
 			want:      "include ~/.ssh/config.d/*\n\nHost example\n",
 		},
@@ -261,8 +261,4 @@ func TestAddSSHConfigInclude(t *testing.T) {
 			}
 		})
 	}
-}
-
-func ptr(s string) *string {
-	return &s
 }

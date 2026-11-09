@@ -378,6 +378,33 @@ func Test_GetWorkstationStates_ExpectedShutdown(t *testing.T) {
 	}
 }
 
+func Test_boostConfigIDs(t *testing.T) {
+	t.Run("nil config", func(t *testing.T) {
+		if got := boostConfigIDs(nil); got != nil {
+			t.Fatalf("boostConfigIDs(nil) = %v, want nil", got)
+		}
+	})
+
+	t.Run("multiple configs", func(t *testing.T) {
+		config := &workstationspb.WorkstationConfig{
+			Host: &workstationspb.WorkstationConfig_Host{
+				Config: &workstationspb.WorkstationConfig_Host_GceInstance_{
+					GceInstance: &workstationspb.WorkstationConfig_Host_GceInstance{
+						BoostConfigs: []*workstationspb.WorkstationConfig_Host_GceInstance_BoostConfig{
+							{Id: "boost-one"},
+							{Id: "boost-two"},
+						},
+					},
+				},
+			},
+		}
+		got := boostConfigIDs(config)
+		if len(got) != 2 || got[0] != "boost-one" || got[1] != "boost-two" {
+			t.Fatalf("boostConfigIDs(config) = %v, want [boost-one boost-two]", got)
+		}
+	})
+}
+
 func Test_ParseWorkstationName(t *testing.T) {
 	tests := []struct {
 		name     string
