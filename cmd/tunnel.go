@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/gateway"
 	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
+	"github.com/bisonschweizag/gws-cli/internal/shutdownlog"
 	"github.com/bisonschweizag/gws-cli/internal/spinner"
 	"github.com/bisonschweizag/gws-cli/internal/tui"
 )
@@ -80,9 +82,34 @@ var tunnelCmd = &cobra.Command{
 		// Stop workstations on exit only if shutdown is still active.
 		// If the user selected "Don't Stop" in the confirmation prompt, ShutdownHookActive is false.
 		if m.ShutdownHookActive {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			_ = gcloud.StopWorkstationsForContexts(ctx, cfg)
-			cancel()
+			if currentContext := cfg.CurrentContext(); currentContext != nil && currentContext.StopWorkstationOnExitTunnel {
+				workstationName := ""
+				if currentContext.GCloud != nil {
+					workstationName = currentContext.GCloud.Name
+				}
+				logShutdown := func(result string) {
+					message := fmt.Sprintf(
+						"context=%q workstation=%q result=%s",
+						cfg.CurrentContextName,
+						workstationName,
+						result,
+					)
+					_ = shutdownlog.Append(shutdownlog.Dir(cfg), message, time.Now())
+				}
+
+				// Log before stopping, so the request is recorded even if the process is killed while stopping.
+				logShutdown("stop requested")
+
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				stopErr := gcloud.StopWorkstationsForContexts(ctx, cfg)
+				cancel()
+
+				if stopErr != nil {
+					logShutdown(fmt.Sprintf("error: %q", stopErr.Error()))
+				} else {
+					logShutdown("stop successful")
+				}
+			}
 		}
 
 		return err
