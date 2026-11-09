@@ -557,6 +557,7 @@ type WorkstationState struct {
 	Context          string
 	Project          string
 	Config           string
+	BoostConfigs     []string
 	Name             string
 	State            workstationspb.Workstation_State
 	NotFound         bool
@@ -565,6 +566,20 @@ type WorkstationState struct {
 	IdleTimeout      *time.Duration
 	ExpectedShutdown *time.Time
 	LastUpdated      *time.Time
+}
+
+func boostConfigIDs(config *workstationspb.WorkstationConfig) []string {
+	if config == nil {
+		return nil
+	}
+
+	var ids []string
+	for _, boostConfig := range config.GetHost().GetGceInstance().GetBoostConfigs() {
+		if boostConfig != nil {
+			ids = append(ids, boostConfig.GetId())
+		}
+	}
+	return ids
 }
 
 func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter string) ([]WorkstationState, error) {
@@ -627,6 +642,7 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter 
 			Context:          name,
 			Project:          ctxCfg.GCloud.Project,
 			Config:           ctxCfg.GCloud.Config,
+			BoostConfigs:     boostConfigIDs(wsc),
 			Name:             ctxCfg.GCloud.Name,
 			State:            ws.GetState(),
 			Uptime:           uptime,

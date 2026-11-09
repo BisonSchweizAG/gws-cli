@@ -30,7 +30,10 @@ var statusCmd = &cobra.Command{
 		}
 
 		output, _ := cmd.Flags().GetString("output")
-		transpose := output == "transpose"
+		transpose := output == "detail" || output == "transpose"
+		if output == "transpose" {
+			cmd.PrintErrln(`Warning: output format "transpose" is deprecated; use "detail" instead.`)
+		}
 		wide := output == "wide" || transpose
 
 		spinner.Disable()
@@ -51,6 +54,7 @@ var statusCmd = &cobra.Command{
 				"CONTEXT",
 				"PROJECT",
 				"CONFIG",
+				"BOOST",
 				"NAME",
 				"STATE",
 				"UPTIME",
@@ -72,8 +76,17 @@ var statusCmd = &cobra.Command{
 			st := workstationState{state: s.State, notFound: s.NotFound}
 			if wide {
 				rows = append(rows, table.Row{
-					contextName, s.Project, s.Config, s.Name, formatState(st), formatUptime(s.Uptime),
-					shutdown, formatUptime(s.RunningTimeout), formatUptime(s.IdleTimeout), formatDateTime(s.LastUpdated),
+					contextName,
+					s.Project,
+					s.Config,
+					strings.Join(s.BoostConfigs, ", "),
+					s.Name,
+					formatState(st),
+					formatUptime(s.Uptime),
+					shutdown,
+					formatUptime(s.RunningTimeout),
+					formatUptime(s.IdleTimeout),
+					formatDateTime(s.LastUpdated),
 				})
 			} else {
 				rows = append(
@@ -232,5 +245,5 @@ func formatDateTime(t *time.Time) string {
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-	statusCmd.Flags().StringP("output", "o", "", "Output format. One of: wide, transpose")
+	statusCmd.Flags().StringP("output", "o", "", "Output format. One of: wide, detail")
 }

@@ -38,6 +38,9 @@ type Model struct {
 
 	SpinnerStopped bool
 
+	// BoostConfig is the active boost config, shown in the header when set.
+	BoostConfig string
+
 	// Auth URL and Clipboard support
 	AuthURL           string
 	CopiedToClipboard bool
@@ -403,6 +406,9 @@ func (m *Model) View() tea.View {
 	if currCtx != nil && currCtx.GCloud != nil {
 		fmt.Fprintf(&left, "  Workstation: %s\n", m.Styles.Success.Render(currCtx.GCloud.Name))
 	}
+	if m.BoostConfig != "" {
+		fmt.Fprintf(&left, "  Boost:       %s\n", m.Styles.Success.Render("🚀 "+m.BoostConfig))
+	}
 	for _, h := range m.Headers {
 		fmt.Fprintf(&left, "  %-13s%s\n", h.Key+":", h.Value)
 	}
@@ -470,11 +476,15 @@ func (m *Model) View() tea.View {
 	if len(m.Logs) > 0 {
 		start := 0
 		// Count the fixed header lines: title(1) + blank(1) + version(1) + config(1) +
-		// context(1) + workstation(1) + headers(N) = 7+N. The logo is 9 lines.
-		// Header height = max(7+N, 9). Then: newline(1) + divider(1) + blank(2) +
+		// context(1) + workstation(1) + boost(0/1) + headers(N) = 7+N(+1). The logo is 9 lines.
+		// Header height = max(header lines, 9). Then: newline(1) + divider(1) + blank(2) +
 		// logs header(1) + newline(1) + blank after logs(2) + help bar(1) = 9.
 		// Border vertical frame = Padding(1,2) + RoundedBorder = 4.
-		headerLines := max(7+len(m.Headers), 9)
+		headerCount := 7 + len(m.Headers)
+		if m.BoostConfig != "" {
+			headerCount++
+		}
+		headerLines := max(headerCount, 9)
 		reservedHeight := headerLines + 9 + 4
 		if m.AuthURL != "" {
 			reservedHeight += 11
