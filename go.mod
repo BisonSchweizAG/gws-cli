@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.0
 	cloud.google.com/go/workstations v1.10.1
 	github.com/atotto/clipboard v0.1.4
 	github.com/bramvdbogaerde/go-scp v1.6.1
