@@ -324,10 +324,12 @@ func Test_GetWorkstationStates_ExpectedShutdown(t *testing.T) {
 
 			clientMu.Lock()
 			cachedClient = client
+			cachedTokenSource = nil
 			clientMu.Unlock()
 			defer func() {
 				clientMu.Lock()
 				cachedClient = nil
+				cachedTokenSource = nil
 				clientMu.Unlock()
 			}()
 
@@ -403,6 +405,71 @@ func Test_boostConfigIDs(t *testing.T) {
 			t.Fatalf("boostConfigIDs(config) = %v, want [boost-one boost-two]", got)
 		}
 	})
+}
+
+func Test_matchBoostConfig(t *testing.T) {
+	config := &workstationspb.WorkstationConfig{
+		Host: &workstationspb.WorkstationConfig_Host{
+			Config: &workstationspb.WorkstationConfig_Host_GceInstance_{
+				GceInstance: &workstationspb.WorkstationConfig_Host_GceInstance{
+					MachineType: "e2-standard-4",
+					BoostConfigs: []*workstationspb.WorkstationConfig_Host_GceInstance_BoostConfig{
+						{Id: "boost-machine", MachineType: "e2-standard-8"},
+						{
+							Id:          "boost-gpu",
+							MachineType: "e2-standard-4",
+							Accelerators: []*workstationspb.WorkstationConfig_Host_GceInstance_Accelerator{
+								{Type: "nvidia-tesla-t4", Count: 1},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		machineType  string
+		accelerators map[string]int64
+		nilConfig    bool
+		want         string
+	}{
+		{
+			name:        "default host",
+			machineType: "zones/us-central1-a/machineTypes/e2-standard-4",
+		},
+		{
+			name:        "boost machine type",
+			machineType: "zones/us-central1-a/machineTypes/e2-standard-8",
+			want:        "boost-machine",
+		},
+		{
+			name:        "accelerator disambiguates boost",
+			machineType: "zones/us-central1-a/machineTypes/e2-standard-4",
+			accelerators: map[string]int64{
+				"nvidia-tesla-t4": 1,
+			},
+			want: "boost-gpu",
+		},
+		{
+			name:        "nil config",
+			machineType: "e2-standard-4",
+			nilConfig:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var wsc *workstationspb.WorkstationConfig
+			if !tt.nilConfig {
+				wsc = config
+			}
+			if got := matchBoostConfig(tt.machineType, tt.accelerators, wsc); got != tt.want {
+				t.Errorf("matchBoostConfig() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
 
 func Test_ParseWorkstationName(t *testing.T) {
@@ -537,10 +604,12 @@ func Test_ListProjectWorkstations(t *testing.T) {
 
 	clientMu.Lock()
 	cachedClient = client
+	cachedTokenSource = nil
 	clientMu.Unlock()
 	defer func() {
 		clientMu.Lock()
 		cachedClient = nil
+		cachedTokenSource = nil
 		clientMu.Unlock()
 	}()
 
@@ -657,10 +726,12 @@ func Test_ListProjectWorkstations_empty(t *testing.T) {
 
 	clientMu.Lock()
 	cachedClient = client
+	cachedTokenSource = nil
 	clientMu.Unlock()
 	defer func() {
 		clientMu.Lock()
 		cachedClient = nil
+		cachedTokenSource = nil
 		clientMu.Unlock()
 	}()
 

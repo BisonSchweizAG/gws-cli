@@ -30,11 +30,11 @@ var statusCmd = &cobra.Command{
 		}
 
 		output, _ := cmd.Flags().GetString("output")
-		transpose := output == "detail" || output == "transpose"
+		detail := output == "detail" || output == "transpose"
 		if output == "transpose" {
 			cmd.PrintErrln(`Warning: output format "transpose" is deprecated; use "detail" instead.`)
 		}
-		wide := output == "wide" || transpose
+		wide := output == "wide" || detail
 
 		spinner.Disable()
 		log.SetLogger(log.Null)
@@ -63,6 +63,9 @@ var statusCmd = &cobra.Command{
 				"IDLE T/O",
 				"LAST UPDATED",
 			}
+			if detail {
+				header = slices.Insert(header, machineTypeColumn, any("MACHINE TYPE"))
+			}
 		} else {
 			header = table.Row{"CONTEXT", "NAME", "STATE", "UPTIME", "SHUTDOWN"}
 		}
@@ -75,25 +78,29 @@ var statusCmd = &cobra.Command{
 			}
 			st := workstationState{state: s.State, notFound: s.NotFound}
 			if wide {
-				rows = append(rows, table.Row{
+				row := table.Row{
 					contextName,
 					s.Project,
 					s.Config,
-					strings.Join(s.BoostConfigs, ", "),
-					s.Name,
+					formatBoostConfigs(s.BoostConfigs, s.ActiveBoostConfig),
+					formatName(s.Name, s.ActiveBoostConfig != ""),
 					formatState(st),
 					formatUptime(s.Uptime),
 					shutdown,
 					formatUptime(s.RunningTimeout),
 					formatUptime(s.IdleTimeout),
 					formatDateTime(s.LastUpdated),
-				})
+				}
+				if detail {
+					row = slices.Insert(row, machineTypeColumn, any(s.MachineType))
+				}
+				rows = append(rows, row)
 			} else {
 				rows = append(
 					rows,
 					table.Row{
 						contextName,
-						s.Name,
+						formatName(s.Name, s.ActiveBoostConfig != ""),
 						formatState(st),
 						formatUptime(s.Uptime),
 						shutdown,
@@ -102,7 +109,7 @@ var statusCmd = &cobra.Command{
 			}
 		}
 
-		if transpose {
+		if detail {
 			contextNames := make([]string, len(states))
 			for i, s := range states {
 				contextNames[i] = formatContext(s.Context, cfg.CurrentContextName, cfg.Contexts)
@@ -130,6 +137,28 @@ var statusCmd = &cobra.Command{
 		t.Render()
 		return nil
 	},
+}
+
+// machineTypeColumn is the position of the MACHINE TYPE column (after BOOST),
+// which is only shown in detail output.
+const machineTypeColumn = 4
+
+func formatName(name string, hasActiveBoost bool) string {
+	if hasActiveBoost {
+		return name + " 🚀"
+	}
+	return name
+}
+
+func formatBoostConfigs(configs []string, active string) string {
+	formatted := make([]string, len(configs))
+	for i, config := range configs {
+		if config == active && active != "" {
+			config = "🟢 " + config
+		}
+		formatted[i] = config
+	}
+	return strings.Join(formatted, " | ")
 }
 
 // transposeTable swaps rows and columns: the header becomes the first

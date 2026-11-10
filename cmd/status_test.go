@@ -41,6 +41,46 @@ func Test_formatContext(t *testing.T) {
 	}
 }
 
+func Test_formatName(t *testing.T) {
+	tests := []struct {
+		name     string
+		active   bool
+		expected string
+	}{
+		{"without boost", false, "my-workstation"},
+		{"with active boost", true, "my-workstation 🚀"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatName("my-workstation", tt.active); got != tt.expected {
+				t.Errorf("formatName() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func Test_formatBoostConfigs(t *testing.T) {
+	tests := []struct {
+		name     string
+		configs  []string
+		active   string
+		expected string
+	}{
+		{"without active boost", []string{"boost-one", "boost-two"}, "", "boost-one | boost-two"},
+		{"active boost marked", []string{"boost-one", "boost-two"}, "boost-two", "boost-one | 🟢 boost-two"},
+		{"no configured boosts", nil, "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatBoostConfigs(tt.configs, tt.active); got != tt.expected {
+				t.Errorf("formatBoostConfigs() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
 func Test_formatState(t *testing.T) {
 	tests := []struct {
 		state    workstationspb.Workstation_State
