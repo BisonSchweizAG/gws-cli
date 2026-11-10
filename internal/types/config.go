@@ -64,7 +64,8 @@ type ChromeBrowserConfig struct {
 }
 
 type GatewayConfig struct {
-	DownloadDestination string `validate:"required" yaml:"downloadDestination"`
+	DownloadDestination string `yaml:"downloadDestination,omitempty"`
+	SkipNoProxyCheck    bool   `yaml:"skipNoProxyCheck,omitempty"`
 }
 
 func (c *Config) Validate() error {

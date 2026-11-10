@@ -1,0 +1,41 @@
+package gateway
+
+import (
+	"context"
+	"runtime"
+
+	"github.com/bisonschweizag/gws-cli/internal/log"
+	"github.com/bisonschweizag/gws-cli/internal/types"
+)
+
+// Run executes all JetBrains Gateway tasks according to the config and logs their outcome.
+func Run(ctx context.Context, cfg *types.Config) error {
+	var gw types.GatewayConfig
+	if cfg != nil && cfg.JetbrainsGateway != nil {
+		gw = *cfg.JetbrainsGateway
+	}
+
+	switch {
+	case gw.DownloadDestination == "":
+		log.Log("JetBrains Gateway downloadDestination is not configured; skipping")
+	case runtime.GOOS != "windows":
+		log.Logf("JetBrains Gateway downloadDestination is only supported on Windows; skipping on %s", runtime.GOOS)
+	default:
+		log.Log("Checking JetBrains Gateway downloadDestination")
+		if err := UpdateDownloadLocation(ctx, cfg); err != nil {
+			return err
+		}
+	}
+
+	if gw.SkipNoProxyCheck {
+		log.Log("JetBrains Gateway skipNoProxyCheck is enabled; skipping proxy settings")
+	} else {
+		log.Log("Checking JetBrains Gateway proxy settings")
+		if err := EnsureNoProxy(ctx, cfg); err != nil {
+			return err
+		}
+	}
+
+	log.Log("JetBrains Gateway tasks finished")
+	return nil
+}

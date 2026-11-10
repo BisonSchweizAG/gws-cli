@@ -136,6 +136,16 @@ gws tunnel --boost my-boost-config
 | `--restart`             | Restart the workstation before opening the tunnel                 |
 | `--boost`               | The boost config to run                                           |
 
+#### `gws jetbrains-gateway`
+
+Apply the `jetbrainsGateway` settings from the config without opening a tunnel. It sets `downloadDestination`
+(Windows only), sets JetBrains Gateway to No proxy (unless `skipNoProxyCheck` is `true`), and logs the result of each
+task.
+
+```bash
+gws jetbrains-gateway
+```
+
 #### `gws launch [context]`
 
 Open the default web URL of the cloud workstation in your browser.
@@ -323,6 +333,7 @@ chromeBrowser:
   profileDirectory: Profile X
 jetbrainsGateway:
   downloadDestination: C:\workspace\Jetbrains-Programs\JetBrainsClientDist
+  skipNoProxyCheck: false
 ```
 
 ### Configuration Options
@@ -361,7 +372,11 @@ jetbrainsGateway:
     - `profileDirectory`: The Chrome profile directory to use. (check profile dir by opening `chrome://version` in
       chrome)
 - `jetbrainsGateway`: Optional JetBrains Gateway configuration.
-    - `downloadDestination`: The directory where JetBrains programs are downloaded.
+    - `downloadDestination`: Optional directory where JetBrains programs are downloaded.
+    - `skipNoProxyCheck`: Optional, default `false`. By default `gws tunnel` checks that JetBrains Gateway is set to
+      No proxy and prints a prominent warning if it is not (it does not change the settings). `gws jetbrains-gateway`
+      sets Gateway to No proxy and backs up existing proxy settings to `proxy.settings.xml.bak`; restart Gateway for
+      the change to take effect. Set to `true` to disable both the check and the fix.
 
 ## Setup in JetBrains Gateway
 

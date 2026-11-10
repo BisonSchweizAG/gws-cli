@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"gopkg.in/yaml.v3"
 )
 
 func TestConfig_Validate(t *testing.T) {
@@ -122,6 +123,29 @@ func TestConfig_Validate(t *testing.T) {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestConfig_ValidateJetbrainsGatewaySkipNoProxyCheckWithoutDownloadDestination(t *testing.T) {
+	var config Config
+	const configYAML = `
+contexts:
+  local:
+    host: localhost
+    port: 22
+currentContext: local
+jetbrainsGateway:
+  skipNoProxyCheck: true
+`
+	if err := yaml.Unmarshal([]byte(configYAML), &config); err != nil {
+		t.Fatalf("failed to unmarshal config: %v", err)
+	}
+	if config.JetbrainsGateway == nil || !config.JetbrainsGateway.SkipNoProxyCheck {
+		t.Fatal("jetbrainsGateway.skipNoProxyCheck was not decoded")
+	}
+
+	if err := config.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
 	}
 }
 
