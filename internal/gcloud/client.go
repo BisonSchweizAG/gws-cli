@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
 
 	workstations "cloud.google.com/go/workstations/apiv1"
 	"cloud.google.com/go/workstations/apiv1/workstationspb"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
+	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/codes"
@@ -24,9 +27,10 @@ import (
 const wsEnvUserName = "BISON_WORKSTATION_USER_NAME"
 
 var (
-	pollInterval = 10 * time.Second
-	clientMu     sync.Mutex
-	cachedClient *workstations.Client
+	pollInterval      = 10 * time.Second
+	clientMu          sync.Mutex
+	cachedClient      *workstations.Client
+	cachedTokenSource oauth2.TokenSource
 )
 
 // getClient returns a shared, reusable workstations.Client, creating it on
@@ -51,7 +55,14 @@ func getClient(ctx context.Context, cfg *types.Config) (*workstations.Client, er
 	}
 
 	cachedClient = c
+	cachedTokenSource = tokenSource
 	return cachedClient, nil
+}
+
+func getCachedTokenSource() oauth2.TokenSource {
+	clientMu.Lock()
+	defer clientMu.Unlock()
+	return cachedTokenSource
 }
 
 // CloseClient closes the shared workstations.Client, if one was created.
@@ -61,11 +72,13 @@ func CloseClient() error {
 	defer clientMu.Unlock()
 
 	if cachedClient == nil {
+		cachedTokenSource = nil
 		return nil
 	}
 
 	err := cachedClient.Close()
 	cachedClient = nil
+	cachedTokenSource = nil
 	return err
 }
 
@@ -198,6 +211,7 @@ func setup(
 		log.Logf("Error getting workstation: %v", err)
 		return nil, nil, nil, nil, err
 	}
+
 	return sshContext, c, wsc, ws, err
 }
 
@@ -554,18 +568,20 @@ func StopWorkstationNow(ctx context.Context, cfg *types.Config) error {
 }
 
 type WorkstationState struct {
-	Context          string
-	Project          string
-	Config           string
-	BoostConfigs     []string
-	Name             string
-	State            workstationspb.Workstation_State
-	NotFound         bool
-	Uptime           *time.Duration
-	RunningTimeout   *time.Duration
-	IdleTimeout      *time.Duration
-	ExpectedShutdown *time.Time
-	LastUpdated      *time.Time
+	Context           string
+	Project           string
+	Config            string
+	BoostConfigs      []string
+	ActiveBoostConfig string
+	MachineType       string
+	Name              string
+	State             workstationspb.Workstation_State
+	NotFound          bool
+	Uptime            *time.Duration
+	RunningTimeout    *time.Duration
+	IdleTimeout       *time.Duration
+	ExpectedShutdown  *time.Time
+	LastUpdated       *time.Time
 }
 
 func boostConfigIDs(config *workstationspb.WorkstationConfig) []string {
@@ -582,8 +598,90 @@ func boostConfigIDs(config *workstationspb.WorkstationConfig) []string {
 	return ids
 }
 
+func matchBoostConfig(machineType string, accelerators map[string]int64, config *workstationspb.WorkstationConfig) string {
+	gceConfig := config.GetHost().GetGceInstance()
+	if gceConfig == nil {
+		return ""
+	}
+
+	if matchesInstanceConfig(
+		machineType,
+		accelerators,
+		gceConfig.GetMachineType(),
+		workstationAcceleratorCounts(gceConfig.GetAccelerators()),
+	) {
+		return ""
+	}
+	for _, boostConfig := range gceConfig.GetBoostConfigs() {
+		if boostConfig != nil && matchesInstanceConfig(
+			machineType,
+			accelerators,
+			boostConfig.GetMachineType(),
+			workstationAcceleratorCounts(boostConfig.GetAccelerators()),
+		) {
+			return boostConfig.GetId()
+		}
+	}
+	return ""
+}
+
+func matchesInstanceConfig(
+	machineType string,
+	accelerators map[string]int64,
+	configuredMachineType string,
+	configuredAccelerators map[string]int64,
+) bool {
+	if resourceName(machineType) == workstationMachineType(configuredMachineType) {
+		return maps.Equal(normalizeAcceleratorCounts(accelerators), configuredAccelerators)
+	}
+	return false
+}
+
+func workstationMachineType(machineType string) string {
+	if machineType == "" {
+		return "e2-standard-4"
+	}
+	return resourceName(machineType)
+}
+
+func resourceName(name string) string {
+	if _, resourceName, found := strings.CutLast(name, "/"); found {
+		return resourceName
+	}
+	return name
+}
+
+func normalizeAcceleratorCounts(accelerators map[string]int64) map[string]int64 {
+	if len(accelerators) == 0 {
+		return nil
+	}
+	normalized := make(map[string]int64, len(accelerators))
+	for acceleratorType, count := range accelerators {
+		normalized[resourceName(acceleratorType)] += count
+	}
+	return normalized
+}
+
+func workstationAcceleratorCounts(
+	accelerators []*workstationspb.WorkstationConfig_Host_GceInstance_Accelerator,
+) map[string]int64 {
+	if len(accelerators) == 0 {
+		return nil
+	}
+	counts := make(map[string]int64, len(accelerators))
+	for _, accelerator := range accelerators {
+		if accelerator != nil {
+			counts[resourceName(accelerator.GetType())] += int64(accelerator.GetCount())
+		}
+	}
+	return counts
+}
+
 func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter string) ([]WorkstationState, error) {
 	var states []WorkstationState
+	var computeService *compute.Service
+	var computeServiceErr error
+	computeServiceInitialized := false
 	curr := cfg.CurrentContextName
 	defer func() { _ = cfg.UseContext(curr) }()
 	for name, ctxCfg := range cfg.Contexts {
@@ -637,19 +735,52 @@ func GetWorkstationStates(ctx context.Context, cfg *types.Config, contextFilter 
 		if ws.GetUpdateTime() != nil {
 			lastUpdated = new(ws.GetUpdateTime().AsTime())
 		}
+		var activeBoostConfig string
+		machineType := workstationMachineType(wsc.GetHost().GetGceInstance().GetMachineType())
+		gceHost := ws.GetRuntimeHost().GetGceInstanceHost()
+		if ws.GetState() == workstationspb.Workstation_STATE_RUNNING && len(boostConfigIDs(wsc)) > 0 &&
+			gceHost != nil && gceHost.GetName() != "" && gceHost.GetZone() != "" {
+			if !computeServiceInitialized {
+				computeServiceInitialized = true
+				if tokenSource := getCachedTokenSource(); tokenSource != nil {
+					computeService, computeServiceErr = compute.NewService(ctx, option.WithTokenSource(tokenSource))
+				}
+			}
+			if computeServiceErr == nil && computeService != nil {
+				instance, err := computeService.Instances.Get(
+					ctxCfg.GCloud.Project,
+					resourceName(gceHost.GetZone()),
+					resourceName(gceHost.GetName()),
+				).Context(ctx).Do()
+				if err == nil && instance != nil {
+					accelerators := make(map[string]int64, len(instance.GuestAccelerators))
+					for _, accelerator := range instance.GuestAccelerators {
+						if accelerator != nil {
+							accelerators[resourceName(accelerator.AcceleratorType)] += accelerator.AcceleratorCount
+						}
+					}
+					activeBoostConfig = matchBoostConfig(instance.MachineType, accelerators, wsc)
+					if instance.MachineType != "" {
+						machineType = resourceName(instance.MachineType)
+					}
+				}
+			}
+		}
 
 		states = append(states, WorkstationState{
-			Context:          name,
-			Project:          ctxCfg.GCloud.Project,
-			Config:           ctxCfg.GCloud.Config,
-			BoostConfigs:     boostConfigIDs(wsc),
-			Name:             ctxCfg.GCloud.Name,
-			State:            ws.GetState(),
-			Uptime:           uptime,
-			RunningTimeout:   runningTimeout,
-			IdleTimeout:      idleTimeout,
-			ExpectedShutdown: expectedShutdown,
-			LastUpdated:      lastUpdated,
+			Context:           name,
+			Project:           ctxCfg.GCloud.Project,
+			Config:            ctxCfg.GCloud.Config,
+			BoostConfigs:      boostConfigIDs(wsc),
+			ActiveBoostConfig: activeBoostConfig,
+			MachineType:       machineType,
+			Name:              ctxCfg.GCloud.Name,
+			State:             ws.GetState(),
+			Uptime:            uptime,
+			RunningTimeout:    runningTimeout,
+			IdleTimeout:       idleTimeout,
+			ExpectedShutdown:  expectedShutdown,
+			LastUpdated:       lastUpdated,
 		})
 	}
 	return states, nil
