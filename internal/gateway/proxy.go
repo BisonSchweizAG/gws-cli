@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/bisonschweizag/gws-cli/internal/log"
@@ -36,7 +37,7 @@ func SkipNoProxyCheck(cfg *types.Config) bool {
 	return cfg != nil && cfg.JetbrainsGateway != nil && cfg.JetbrainsGateway.SkipNoProxyCheck
 }
 
-// EnsureNoProxy sets every JetBrains Gateway config to No proxy unless skipNoProxyCheck is set.
+// EnsureNoProxy sets JetBrains Gateway proxy settings to No proxy unless skipNoProxyCheck is set.
 func EnsureNoProxy(_ context.Context, cfg *types.Config) error {
 	if SkipNoProxyCheck(cfg) {
 		return nil
@@ -47,10 +48,10 @@ func EnsureNoProxy(_ context.Context, cfg *types.Config) error {
 		return err
 	}
 
-	return ensureNoProxyIn(baseDir)
+	return ensureNoProxyIn(baseDir, checkAllNoProxyVersions(cfg))
 }
 
-// CheckNoProxy logs a prominent warning for every JetBrains Gateway config that is not set to No proxy.
+// CheckNoProxy logs a prominent warning for JetBrains Gateway proxy settings that are not set to No proxy.
 // It never modifies any file and does nothing when skipNoProxyCheck is set.
 func CheckNoProxy(_ context.Context, cfg *types.Config) error {
 	if SkipNoProxyCheck(cfg) {
@@ -62,7 +63,11 @@ func CheckNoProxy(_ context.Context, cfg *types.Config) error {
 		return err
 	}
 
-	return checkNoProxyIn(baseDir)
+	return checkNoProxyIn(baseDir, checkAllNoProxyVersions(cfg))
+}
+
+func checkAllNoProxyVersions(cfg *types.Config) bool {
+	return cfg != nil && cfg.JetbrainsGateway != nil && cfg.JetbrainsGateway.CheckAllNoProxyVersions
 }
 
 func jetBrainsBaseDir() (string, error) {
@@ -73,8 +78,8 @@ func jetBrainsBaseDir() (string, error) {
 	return filepath.Join(configDir, jetBrainsConfigDir), nil
 }
 
-func checkNoProxyIn(baseDir string) error {
-	return forEachProxySettingsFile(baseDir, func(path string) error {
+func checkNoProxyIn(baseDir string, all bool) error {
+	return forEachProxySettingsFile(baseDir, all, func(path string) error {
 		ok, err := isNoProxyFile(path)
 		if err != nil {
 			return err
@@ -101,8 +106,8 @@ func noProxyWarning(path string) string {
 	}, "\n")
 }
 
-func ensureNoProxyIn(baseDir string) error {
-	return forEachProxySettingsFile(baseDir, func(path string) error {
+func ensureNoProxyIn(baseDir string, all bool) error {
+	return forEachProxySettingsFile(baseDir, all, func(path string) error {
 		changed, err := fixProxyFile(path)
 		if err != nil {
 			return err
@@ -116,14 +121,14 @@ func ensureNoProxyIn(baseDir string) error {
 	})
 }
 
-func forEachProxySettingsFile(baseDir string, fn func(path string) error) error {
+func forEachProxySettingsFile(baseDir string, all bool, fn func(path string) error) error {
 	pattern := filepath.Join(baseDir, gatewayConfigGlob)
 	configDirs, err := filepath.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("find JetBrains Gateway config directories in %q: %w", baseDir, err)
 	}
 
-	found := false
+	var gatewayDirs []string
 	for _, configDir := range configDirs {
 		info, err := os.Stat(configDir)
 		if err != nil {
@@ -132,18 +137,75 @@ func forEachProxySettingsFile(baseDir string, fn func(path string) error) error 
 		if !info.IsDir() {
 			continue
 		}
-		found = true
+		gatewayDirs = append(gatewayDirs, configDir)
+	}
 
+	if !all && len(gatewayDirs) > 0 {
+		gatewayDirs = []string{latestGatewayDir(gatewayDirs)}
+	}
+
+	for _, configDir := range gatewayDirs {
 		if err := fn(filepath.Join(configDir, "options", proxySettingsFile)); err != nil {
 			return err
 		}
 	}
 
-	if !found {
+	if len(gatewayDirs) == 0 {
 		log.Logf(`No JetBrains Gateway config directories found in "%s"`, baseDir)
 	}
 
 	return nil
+}
+
+func latestGatewayDir(configDirs []string) string {
+	latest := ""
+	for _, configDir := range configDirs {
+		if latest == "" || compareGatewayVersions(configDir, latest) > 0 {
+			latest = configDir
+		}
+	}
+	return latest
+}
+
+func compareGatewayVersions(leftDir, rightDir string) int {
+	leftVersion := strings.TrimPrefix(filepath.Base(leftDir), "JetBrainsGateway")
+	rightVersion := strings.TrimPrefix(filepath.Base(rightDir), "JetBrainsGateway")
+	leftParts := strings.Split(leftVersion, ".")
+	rightParts := strings.Split(rightVersion, ".")
+
+	for i := range max(len(leftParts), len(rightParts)) {
+		leftPart, leftOK := gatewayVersionPart(leftParts, i)
+		rightPart, rightOK := gatewayVersionPart(rightParts, i)
+		if !leftOK || !rightOK {
+			return strings.Compare(leftVersion, rightVersion)
+		}
+		if leftPart < rightPart {
+			return -1
+		}
+		if leftPart > rightPart {
+			return 1
+		}
+	}
+
+	return strings.Compare(leftVersion, rightVersion)
+}
+
+func gatewayVersionPart(parts []string, index int) (int, bool) {
+	if index >= len(parts) {
+		return 0, true
+	}
+
+	part := parts[index]
+	digits := 0
+	for digits < len(part) && part[digits] >= '0' && part[digits] <= '9' {
+		digits++
+	}
+	if digits == 0 {
+		return 0, false
+	}
+
+	version, err := strconv.Atoi(part[:digits])
+	return version, err == nil
 }
 
 // isNoProxyFile reports whether the file at path is explicitly set to No proxy. A missing file is reported as not set.

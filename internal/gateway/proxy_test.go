@@ -166,7 +166,7 @@ func TestEnsureNoProxyInCreatesMissingProxySettings(t *testing.T) {
 				}
 			}
 
-			if err := ensureNoProxyIn(baseDir); err != nil {
+			if err := ensureNoProxyIn(baseDir, false); err != nil {
 				t.Fatalf("ensureNoProxyIn() error = %v", err)
 			}
 
@@ -196,7 +196,7 @@ func TestEnsureNoProxyInUpdatesEveryGatewayDirectory(t *testing.T) {
 		`<application><component name="HttpConfigurable"><option name="USE_PROXY_PAC" value="true"/></component></application>`,
 	)
 
-	if err := ensureNoProxyIn(baseDir); err != nil {
+	if err := ensureNoProxyIn(baseDir, true); err != nil {
 		t.Fatalf("ensureNoProxyIn() error = %v", err)
 	}
 	for _, path := range []string{first, second} {
@@ -211,8 +211,51 @@ func TestEnsureNoProxyInUpdatesEveryGatewayDirectory(t *testing.T) {
 	}
 }
 
+func TestEnsureNoProxyInUpdatesOnlyLatestGatewayDirectoryByDefault(t *testing.T) {
+	baseDir := filepath.Join(t.TempDir(), "JetBrains")
+	olderContent := `<application><component name="HttpConfigurable"><option name="USE_HTTP_PROXY" value="true"/></component></application>`
+	latestContent := `<application><component name="HttpConfigurable"><option name="USE_PROXY_PAC" value="true"/></component></application>`
+	older := writeProxySettingsForTest(t, baseDir, "JetBrainsGateway2024.2", olderContent)
+	latest := writeProxySettingsForTest(t, baseDir, "JetBrainsGateway2024.10", latestContent)
+
+	if err := ensureNoProxyIn(baseDir, false); err != nil {
+		t.Fatalf("ensureNoProxyIn() error = %v", err)
+	}
+
+	got, err := os.ReadFile(older)
+	if err != nil {
+		t.Fatalf("failed to read older proxy settings: %v", err)
+	}
+	if string(got) != olderContent {
+		t.Errorf("older proxy settings changed: got %q, want %q", got, olderContent)
+	}
+	if _, err := os.Stat(older + ".bak"); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("older backup stat error = %v, want os.ErrNotExist", err)
+	}
+
+	settings := readProxySettingsForTest(t, latest)
+	options := httpOptionsForTest(t, settings)
+	if options[useHTTPProxyOption] != "false" || options[useProxyPACOption] != "false" {
+		t.Errorf("latest proxy options = %v, want both false", options)
+	}
+	if _, err := os.Stat(latest + ".bak"); err != nil {
+		t.Errorf("latest backup: %v", err)
+	}
+}
+
+func TestLatestGatewayDirUsesNumericVersionOrdering(t *testing.T) {
+	configDirs := []string{
+		"/JetBrains/JetBrainsGateway2024.2",
+		"/JetBrains/JetBrainsGateway2024.10",
+		"/JetBrains/JetBrainsGateway2023.12",
+	}
+	if got, want := filepath.Base(latestGatewayDir(configDirs)), "JetBrainsGateway2024.10"; got != want {
+		t.Errorf("latestGatewayDir() = %q, want %q", got, want)
+	}
+}
+
 func TestEnsureNoProxyInNoGatewayDirectories(t *testing.T) {
-	if err := ensureNoProxyIn(t.TempDir()); err != nil {
+	if err := ensureNoProxyIn(t.TempDir(), false); err != nil {
 		t.Fatalf("ensureNoProxyIn() error = %v, want nil", err)
 	}
 }
@@ -225,7 +268,7 @@ func TestEnsureNoProxyInMalformedXMLLeavesFileUnchanged(t *testing.T) {
 		t.Fatalf("failed to read original proxy settings: %v", err)
 	}
 
-	err = ensureNoProxyIn(baseDir)
+	err = ensureNoProxyIn(baseDir, false)
 	if err == nil || !strings.Contains(err.Error(), "decode proxy settings") {
 		t.Fatalf("ensureNoProxyIn() error = %v, want a decode error", err)
 	}
@@ -274,6 +317,30 @@ func TestEnsureNoProxyIsOptOut(t *testing.T) {
 				t.Errorf("proxy settings changed = %v, want %v", changed, tt.wantChanged)
 			}
 		})
+	}
+}
+
+func TestEnsureNoProxyUsesAllVersionsWhenConfigured(t *testing.T) {
+	baseDir := isolateUserConfigDirForTest(t)
+	active := `<application><component name="HttpConfigurable"><option name="USE_HTTP_PROXY" value="true"/></component></application>`
+	paths := []string{
+		writeProxySettingsForTest(t, baseDir, "JetBrainsGateway2024.2", active),
+		writeProxySettingsForTest(t, baseDir, "JetBrainsGateway2024.10", active),
+	}
+	cfg := &types.Config{JetbrainsGateway: &types.GatewayConfig{CheckAllNoProxyVersions: true}}
+
+	if err := EnsureNoProxy(t.Context(), cfg); err != nil {
+		t.Fatalf("EnsureNoProxy() error = %v", err)
+	}
+	for _, path := range paths {
+		settings := readProxySettingsForTest(t, path)
+		options := httpOptionsForTest(t, settings)
+		if options[useHTTPProxyOption] != "false" || options[useProxyPACOption] != "false" {
+			t.Errorf("proxy options in %q = %v, want both false", path, options)
+		}
+		if _, err := os.Stat(path + ".bak"); err != nil {
+			t.Errorf("backup for %q: %v", path, err)
+		}
 	}
 }
 
@@ -344,6 +411,44 @@ func TestCheckNoProxyWarnsWithoutWriting(t *testing.T) {
 			}
 			if _, err := os.Stat(path + ".bak"); !errors.Is(err, os.ErrNotExist) {
 				t.Errorf("backup stat error = %v, want os.ErrNotExist", err)
+			}
+		})
+	}
+}
+
+func TestCheckNoProxyUsesLatestVersionByDefault(t *testing.T) {
+	active := `<application><component name="HttpConfigurable"><option name="USE_HTTP_PROXY" value="true"/></component></application>`
+	noProxy := `<application><component name="HttpConfigurable"><option name="USE_HTTP_PROXY" value="false"/></component></application>`
+	tests := []struct {
+		name     string
+		cfg      *types.Config
+		wantWarn bool
+	}{
+		{name: "latest only"},
+		{
+			name:     "all versions",
+			cfg:      &types.Config{JetbrainsGateway: &types.GatewayConfig{CheckAllNoProxyVersions: true}},
+			wantWarn: true,
+		},
+	}
+
+	previous := log.GetLogger()
+	t.Cleanup(func() { log.SetLogger(previous) })
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseDir := isolateUserConfigDirForTest(t)
+			writeProxySettingsForTest(t, baseDir, "JetBrainsGateway2024.2", active)
+			writeProxySettingsForTest(t, baseDir, "JetBrainsGateway2024.10", noProxy)
+
+			var logs []string
+			log.SetLogger(func(s string) { logs = append(logs, s) })
+			if err := CheckNoProxy(t.Context(), tt.cfg); err != nil {
+				t.Fatalf("CheckNoProxy() error = %v", err)
+			}
+
+			warned := strings.Contains(strings.Join(logs, "\n"), "WARNING: JetBrains Gateway is NOT set")
+			if warned != tt.wantWarn {
+				t.Errorf("warning logged = %v, want %v; logs = %q", warned, tt.wantWarn, logs)
 			}
 		})
 	}
