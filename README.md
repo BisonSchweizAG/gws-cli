@@ -140,11 +140,19 @@ gws tunnel --boost my-boost-config
 
 Apply the `jetbrainsGateway` settings from the config without opening a tunnel. It sets `downloadDestination`
 (Windows only), sets the latest installed JetBrains Gateway version to No proxy (unless `skipNoProxyCheck` is `true`),
-and logs the result of each task.
+and logs the result of each task. Use `--all` to process every installed version instead of only the latest, or `--check`
+to report mismatches without modifying proxy settings or the Windows registry.
 
 ```bash
 gws jetbrains-gateway
+gws jetbrains-gateway --all
+gws jetbrains-gateway --check
 ```
+
+| Flag      | Description                                                          |
+|-----------|----------------------------------------------------------------------|
+| `--all`   | Check or update all installed JetBrains Gateway versions             |
+| `--check` | Only check settings; do not modify proxy settings or registry values |
 
 #### `gws launch [context]`
 

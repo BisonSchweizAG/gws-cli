@@ -11,3 +11,7 @@ import (
 func UpdateDownloadLocation(_ context.Context, _ *types.Config) error {
 	return nil
 }
+
+func CheckDownloadLocation(_ context.Context, _ *types.Config) error {
+	return nil
+}

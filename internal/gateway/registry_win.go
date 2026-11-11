@@ -4,6 +4,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/bisonschweizag/gws-cli/internal/log"
@@ -16,6 +17,51 @@ const (
 	fullKey                  = `HKEY_CURRENT_USER\` + keyJetBrainsClient
 	valueDownloadDestination = "downloadDestination"
 )
+
+func CheckDownloadLocation(_ context.Context, cfg *types.Config) error {
+	if cfg == nil || cfg.JetbrainsGateway == nil || cfg.JetbrainsGateway.DownloadDestination == "" {
+		return nil
+	}
+
+	key, err := registry.OpenKey(registry.CURRENT_USER, keyJetBrainsClient, registry.QUERY_VALUE)
+	if err != nil {
+		if errors.Is(err, registry.ErrNotExist) {
+			log.Logf(
+				`WARNING: JetbrainsGateway DownloadDestination registry key "%s" does not exist; expected "%s"`,
+				fullKey,
+				cfg.JetbrainsGateway.DownloadDestination,
+			)
+			return nil
+		}
+		return fmt.Errorf("open JetBrains registry key: %w", err)
+	}
+	defer key.Close()
+
+	current, _, err := key.GetStringValue(valueDownloadDestination)
+	if err != nil {
+		if errors.Is(err, registry.ErrNotExist) {
+			log.Logf(
+				`WARNING: JetbrainsGateway DownloadDestination is not configured in "%s"; expected "%s"`,
+				fullKey,
+				cfg.JetbrainsGateway.DownloadDestination,
+			)
+			return nil
+		}
+		return fmt.Errorf("read %s: %w", valueDownloadDestination, err)
+	}
+
+	if current == cfg.JetbrainsGateway.DownloadDestination {
+		log.Logf(`JetbrainsGateway DownloadDestination is correctly set in "%s"`, fullKey)
+	} else {
+		log.Logf(
+			`WARNING: JetbrainsGateway DownloadDestination is "%s" in "%s", expected "%s"`,
+			current,
+			fullKey,
+			cfg.JetbrainsGateway.DownloadDestination,
+		)
+	}
+	return nil
+}
 
 func UpdateDownloadLocation(ctx context.Context, cfg *types.Config) error {
 	if cfg == nil || cfg.JetbrainsGateway == nil || cfg.JetbrainsGateway.DownloadDestination == "" {

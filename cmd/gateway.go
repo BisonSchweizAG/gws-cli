@@ -15,10 +15,14 @@ var gatewayCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return gateway.Run(cmd.Context(), cfg)
+		all, _ := cmd.Flags().GetBool("all")
+		check, _ := cmd.Flags().GetBool("check")
+		return gateway.Run(cmd.Context(), cfg, gateway.Options{All: all, Check: check})
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(gatewayCmd)
+	gatewayCmd.Flags().Bool("all", false, "Check or update all installed JetBrains Gateway versions")
+	gatewayCmd.Flags().Bool("check", false, "Only check settings without modifying them")
 }
