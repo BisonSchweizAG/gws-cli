@@ -48,6 +48,9 @@ var tunnelCmd = &cobra.Command{
 			if err := gateway.UpdateDownloadLocation(ctx, cfg); err != nil {
 				return err
 			}
+			if err := gateway.CheckNoProxy(ctx, cfg); err != nil {
+				return err
+			}
 
 			if err := gcloud.StartWorkstation(ctx, cfg, flagBoostConfig); err != nil {
 				return err

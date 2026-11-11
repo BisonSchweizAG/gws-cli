@@ -136,6 +136,24 @@ gws tunnel --boost my-boost-config
 | `--restart`             | Restart the workstation before opening the tunnel                 |
 | `--boost`               | The boost config to run                                           |
 
+#### `gws jetbrains-gateway`
+
+Apply the `jetbrainsGateway` settings from the config without opening a tunnel. It sets `downloadDestination`
+(Windows only), sets the latest installed JetBrains Gateway version to No proxy (unless `skipNoProxyCheck` is `true`),
+and logs the result of each task. Use `--all` to process every installed version instead of only the latest, or `--check`
+to report mismatches without modifying proxy settings or the Windows registry.
+
+```bash
+gws jetbrains-gateway
+gws jetbrains-gateway --all
+gws jetbrains-gateway --check
+```
+
+| Flag      | Description                                                          |
+|-----------|----------------------------------------------------------------------|
+| `--all`   | Check or update all installed JetBrains Gateway versions             |
+| `--check` | Only check settings; do not modify proxy settings or registry values |
+
 #### `gws launch [context]`
 
 Open the default web URL of the cloud workstation in your browser.
@@ -323,6 +341,8 @@ chromeBrowser:
   profileDirectory: Profile X
 jetbrainsGateway:
   downloadDestination: C:\workspace\Jetbrains-Programs\JetBrainsClientDist
+  skipNoProxyCheck: false
+  checkAllNoProxyVersions: false
 ```
 
 ### Configuration Options
@@ -361,7 +381,14 @@ jetbrainsGateway:
     - `profileDirectory`: The Chrome profile directory to use. (check profile dir by opening `chrome://version` in
       chrome)
 - `jetbrainsGateway`: Optional JetBrains Gateway configuration.
-    - `downloadDestination`: The directory where JetBrains programs are downloaded.
+    - `downloadDestination`: Optional directory where JetBrains programs are downloaded.
+    - `skipNoProxyCheck`: Optional, default `false`. By default `gws tunnel` checks that the latest installed
+      JetBrains Gateway version is set to No proxy and prints a prominent warning if it is not (it does not change the
+      settings). `gws jetbrains-gateway` sets Gateway to No proxy and backs up existing proxy settings to
+      `proxy.settings.xml.bak`; restart Gateway for the change to take effect. Set to `true` to disable both the check
+      and the fix.
+    - `checkAllNoProxyVersions`: Optional, default `false`. By default, only the latest installed JetBrains Gateway
+      version is checked and set to No proxy. Set to `true` to check and set all installed versions.
 
 ## Setup in JetBrains Gateway
 
