@@ -396,7 +396,7 @@ func TestCheckNoProxyWarnsWithoutWriting(t *testing.T) {
 				t.Fatalf("CheckNoProxy() error = %v, want nil", err)
 			}
 
-			warned := strings.Contains(strings.Join(logs, "\n"), "WARNING: JetBrains Gateway is NOT set")
+			warned := strings.Contains(strings.Join(logs, "\n"), "⚠️  WARNING: Gateway proxy is NOT set to No proxy")
 			if warned != tt.wantWarn {
 				t.Errorf("warning logged = %v, want %v; logs = %q", warned, tt.wantWarn, logs)
 			}
@@ -446,11 +446,30 @@ func TestCheckNoProxyUsesLatestVersionByDefault(t *testing.T) {
 				t.Fatalf("CheckNoProxy() error = %v", err)
 			}
 
-			warned := strings.Contains(strings.Join(logs, "\n"), "WARNING: JetBrains Gateway is NOT set")
+			warned := strings.Contains(strings.Join(logs, "\n"), "⚠️  WARNING: Gateway proxy is NOT set to No proxy")
 			if warned != tt.wantWarn {
 				t.Errorf("warning logged = %v, want %v; logs = %q", warned, tt.wantWarn, logs)
 			}
 		})
+	}
+}
+
+func TestNoProxyWarningIsTUIFriendly(t *testing.T) {
+	lines := noProxyWarning("/home/user/.config/JetBrains/JetBrainsGateway2025.3/options/ide.general.xml")
+	if len(lines) == 0 {
+		t.Fatal("noProxyWarning() returned no lines")
+	}
+
+	for _, line := range lines {
+		if strings.ContainsAny(line, "\r\n") {
+			t.Errorf("warning line contains a newline: %q", line)
+		}
+		if strings.Contains(line, "!!!") {
+			t.Errorf("warning line contains a banner: %q", line)
+		}
+		if length := len([]rune(line)); length > 100 {
+			t.Errorf("warning line is too long (%d characters): %q", length, line)
+		}
 	}
 }
 

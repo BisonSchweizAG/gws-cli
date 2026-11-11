@@ -27,7 +27,7 @@ func CheckDownloadLocation(_ context.Context, cfg *types.Config) error {
 	if err != nil {
 		if errors.Is(err, registry.ErrNotExist) {
 			log.Logf(
-				`WARNING: JetbrainsGateway DownloadDestination registry key "%s" does not exist; expected "%s"`,
+				`⚠️ WARNING: JetbrainsGateway DownloadDestination registry key "%s" does not exist; expected "%s"`,
 				fullKey,
 				cfg.JetbrainsGateway.DownloadDestination,
 			)
@@ -41,7 +41,7 @@ func CheckDownloadLocation(_ context.Context, cfg *types.Config) error {
 	if err != nil {
 		if errors.Is(err, registry.ErrNotExist) {
 			log.Logf(
-				`WARNING: JetbrainsGateway DownloadDestination is not configured in "%s"; expected "%s"`,
+				`⚠️ WARNING: JetbrainsGateway DownloadDestination is not configured in "%s"; expected "%s"`,
 				fullKey,
 				cfg.JetbrainsGateway.DownloadDestination,
 			)
@@ -51,10 +51,10 @@ func CheckDownloadLocation(_ context.Context, cfg *types.Config) error {
 	}
 
 	if current == cfg.JetbrainsGateway.DownloadDestination {
-		log.Logf(`JetbrainsGateway DownloadDestination is correctly set in "%s"`, fullKey)
+		log.Logf(`✅ JetbrainsGateway DownloadDestination is correctly set in "%s"`, fullKey)
 	} else {
 		log.Logf(
-			`WARNING: JetbrainsGateway DownloadDestination is "%s" in "%s", expected "%s"`,
+			`⚠️ WARNING: JetbrainsGateway DownloadDestination is "%s" in "%s", expected "%s"`,
 			current,
 			fullKey,
 			cfg.JetbrainsGateway.DownloadDestination,
@@ -75,7 +75,7 @@ func UpdateDownloadLocation(ctx context.Context, cfg *types.Config) error {
 		}
 
 		// Key doesn't exist, so create it.
-		log.Logf(`Creating registry key "%s"`, fullKey)
+		log.Logf(`🔧 Creating registry key "%s"`, fullKey)
 		key, _, err = registry.CreateKey(registry.CURRENT_USER, keyJetBrainsClient, registry.QUERY_VALUE|registry.SET_VALUE)
 		if err != nil {
 			return fmt.Errorf("create JetBrains registry key: %w", err)
@@ -91,15 +91,15 @@ func UpdateDownloadLocation(ctx context.Context, cfg *types.Config) error {
 
 	// Already configured correctly; don't write anything.
 	if err == nil && current == cfg.JetbrainsGateway.DownloadDestination {
-		log.Logf(`JetbrainsGateway DownloadDestination is correctly set in "%s"`, fullKey)
+		log.Logf(`✅ JetbrainsGateway DownloadDestination is correctly set in "%s"`, fullKey)
 		return nil
 	}
 
 	// Value is missing or different, so update it.
 	if current == "" {
-		log.Logf(`Creating JetbrainsGateway DownloadDestination registry entry "%s" in "%s"`, cfg.JetbrainsGateway.DownloadDestination, fullKey)
+		log.Logf(`🔧 Creating JetbrainsGateway DownloadDestination registry entry "%s" in "%s"`, cfg.JetbrainsGateway.DownloadDestination, fullKey)
 	} else {
-		log.Logf(`Updating JetbrainsGateway DownloadDestination registry entry from "%s" to "%s" in "%s"`, current, cfg.JetbrainsGateway.DownloadDestination, fullKey)
+		log.Logf(`🔧 Updating JetbrainsGateway DownloadDestination registry entry from "%s" to "%s" in "%s"`, current, cfg.JetbrainsGateway.DownloadDestination, fullKey)
 	}
 	if err := key.SetStringValue(valueDownloadDestination, cfg.JetbrainsGateway.DownloadDestination); err != nil {
 		return fmt.Errorf("set %s: %w", valueDownloadDestination, err)

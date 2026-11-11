@@ -85,25 +85,27 @@ func checkNoProxyIn(baseDir string, all bool) error {
 			return err
 		}
 		if ok {
-			log.Logf(`JetBrains Gateway proxy settings are correctly set in "%s"`, path)
+			log.Logf(`✅ JetBrains Gateway proxy settings are correctly set in "%s"`, path)
 			return nil
 		}
-		log.Log(noProxyWarning(path))
+		for _, line := range noProxyWarning(path) {
+			log.Log(line)
+		}
 		return nil
 	})
 }
 
-func noProxyWarning(path string) string {
-	banner := strings.Repeat("!", 100)
-	return strings.Join([]string{
-		banner,
-		"!!! WARNING: JetBrains Gateway is NOT set to \"No proxy\"",
-		"!!! Settings file: " + path,
-		"!!! Connections through the gws tunnel may fail behind a proxy.",
-		"!!! Run `gws jetbrains-gateway` to fix it and restart Gateway,",
-		"!!! or set `jetbrainsGateway.skipNoProxyCheck: true` to disable this check.",
-		banner,
-	}, "\n")
+func noProxyWarning(path string) []string {
+	sep := "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	return []string{
+		sep,
+		"⚠️  WARNING: Gateway proxy is NOT set to No proxy",
+		"⚠️  Tunnel connections may fail behind a proxy.",
+		"📄 Settings: " + path,
+		"💡 Run `gws jetbrains-gateway` and restart Gateway.",
+		"💡 Or set No proxy in Gateway Settings ⚙.",
+		sep,
+	}
 }
 
 func ensureNoProxyIn(baseDir string, all bool) error {
@@ -113,9 +115,9 @@ func ensureNoProxyIn(baseDir string, all bool) error {
 			return err
 		}
 		if changed {
-			log.Logf(`JetBrains Gateway proxy settings set to No proxy in "%s"; restart Gateway to apply the change`, path)
+			log.Logf(`🔧 JetBrains Gateway proxy settings set to No proxy in "%s"; restart Gateway to apply the change`, path)
 		} else {
-			log.Logf(`JetBrains Gateway proxy settings are correctly set in "%s"`, path)
+			log.Logf(`✅ JetBrains Gateway proxy settings are correctly set in "%s"`, path)
 		}
 		return nil
 	})
@@ -151,7 +153,7 @@ func forEachProxySettingsFile(baseDir string, all bool, fn func(path string) err
 	}
 
 	if len(gatewayDirs) == 0 {
-		log.Logf(`No JetBrains Gateway config directories found in "%s"`, baseDir)
+		log.Logf(`📂 No JetBrains Gateway config directories found in "%s"`, baseDir)
 	}
 
 	return nil
