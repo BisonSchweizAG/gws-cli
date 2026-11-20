@@ -15,6 +15,7 @@ import (
 	"github.com/bisonschweizag/gws-cli/internal/gateway"
 	"github.com/bisonschweizag/gws-cli/internal/gcloud"
 	"github.com/bisonschweizag/gws-cli/internal/log"
+	"github.com/bisonschweizag/gws-cli/internal/sessionend"
 	"github.com/bisonschweizag/gws-cli/internal/shutdownlog"
 	"github.com/bisonschweizag/gws-cli/internal/spinner"
 	"github.com/bisonschweizag/gws-cli/internal/tui"
@@ -74,14 +75,30 @@ var tunnelCmd = &cobra.Command{
 
 		// Listen for SIGHUP (terminal close) so shutdown runs when the terminal is closed.
 		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGHUP)
+		signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGTERM)
+		defer signal.Stop(sigCh)
+
+		var sessionEndCh <-chan struct{}
+		releaseSessionEnd := func() {}
+		if currentContext := cfg.CurrentContext(); currentContext != nil && currentContext.StopWorkstationOnExitTunnel {
+			sessionEndCh, releaseSessionEnd = sessionend.Listen()
+		}
+		defer releaseSessionEnd()
+
 		p := tea.NewProgram(m)
+		done := make(chan struct{})
 		go func() {
-			<-sigCh
+			select {
+			case <-sigCh:
+			case <-sessionEndCh:
+			case <-done:
+				return
+			}
 			p.Send(tea.QuitMsg{})
 		}()
 
 		_, err = p.Run()
+		close(done)
 
 		// Stop workstations on exit only if shutdown is still active.
 		// If the user selected "Don't Stop" in the confirmation prompt, ShutdownHookActive is false.
