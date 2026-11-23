@@ -22,12 +22,7 @@ func Run(ctx context.Context, cfg *types.Config, opts Options) error {
 	}
 	all := opts.All || checkAllNoProxyVersions(cfg)
 
-	switch {
-	case gw.DownloadDestination == "":
-		log.Log("⏭️ JetBrains Gateway downloadDestination is not configured; skipping")
-	case runtime.GOOS != "windows":
-		log.Logf("⏭️ JetBrains Gateway downloadDestination is only supported on Windows; skipping on %s", runtime.GOOS)
-	default:
+	if gw.DownloadDestination != "" && runtime.GOOS == "windows" {
 		log.Log("🔍 Checking JetBrains Gateway downloadDestination")
 		var err error
 		if opts.Check {
@@ -40,9 +35,7 @@ func Run(ctx context.Context, cfg *types.Config, opts Options) error {
 		}
 	}
 
-	if gw.SkipNoProxyCheck {
-		log.Log("⏭️ JetBrains Gateway skipNoProxyCheck is enabled; skipping proxy settings")
-	} else {
+	if !gw.SkipNoProxyCheck {
 		log.Log("🔍 Checking JetBrains Gateway proxy settings")
 		baseDir, err := jetBrainsBaseDir()
 		if err != nil {
