@@ -27,7 +27,7 @@ func CheckDownloadLocation(_ context.Context, cfg *types.Config) error {
 	if err != nil {
 		if errors.Is(err, registry.ErrNotExist) {
 			log.Logf(
-				`⚠️ WARNING: JetbrainsGateway DownloadDestination registry key "%s" does not exist; expected "%s"`,
+				`🚨 WARNING: JetbrainsGateway DownloadDestination registry key "%s" does not exist; expected "%s"`,
 				fullKey,
 				cfg.JetbrainsGateway.DownloadDestination,
 			)
@@ -41,7 +41,7 @@ func CheckDownloadLocation(_ context.Context, cfg *types.Config) error {
 	if err != nil {
 		if errors.Is(err, registry.ErrNotExist) {
 			log.Logf(
-				`⚠️ WARNING: JetbrainsGateway DownloadDestination is not configured in "%s"; expected "%s"`,
+				`🚨 WARNING: JetbrainsGateway DownloadDestination is not configured in "%s"; expected "%s"`,
 				fullKey,
 				cfg.JetbrainsGateway.DownloadDestination,
 			)
@@ -54,7 +54,7 @@ func CheckDownloadLocation(_ context.Context, cfg *types.Config) error {
 		log.Logf(`✅ JetbrainsGateway DownloadDestination is correctly set in "%s"`, fullKey)
 	} else {
 		log.Logf(
-			`⚠️ WARNING: JetbrainsGateway DownloadDestination is "%s" in "%s", expected "%s"`,
+			`🚨 WARNING: JetbrainsGateway DownloadDestination is "%s" in "%s", expected "%s"`,
 			current,
 			fullKey,
 			cfg.JetbrainsGateway.DownloadDestination,

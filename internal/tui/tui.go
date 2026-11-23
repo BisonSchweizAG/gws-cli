@@ -270,10 +270,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				currCtx.StopWorkstationOnExitTunnel = !currCtx.StopWorkstationOnExitTunnel
 				m.ShutdownHookActive = currCtx.StopWorkstationOnExitTunnel
 				if err := m.Config.SaveConfig(); err != nil {
-					m.Logs = append(m.Logs, fmt.Sprintf("⚠ Failed to save config: %v", err))
+					m.Logs = append(m.Logs, fmt.Sprintf("🚨 Failed to save config: %v", err))
 				}
 				if m.ShutdownHookActive {
-					m.Logs = append(m.Logs, "⚠  Stop on exit enabled — workstation will stop when tunnel exits")
+					m.Logs = append(m.Logs, "⚡ Stop on exit enabled — workstation will stop when tunnel exits")
 				} else {
 					m.Logs = append(m.Logs, "✓ Stop on exit disabled")
 				}
@@ -526,7 +526,7 @@ func (m *Model) View() tea.View {
 	if m.ShutdownConfirming {
 		var confirmCard strings.Builder
 		confirmCard.WriteString(
-			m.Styles.Badge.Background(Amber).Foreground(lipgloss.Color("235")).Render(" ⚠ CONFIRM SHUTDOWN "),
+			m.Styles.Badge.Background(Amber).Foreground(lipgloss.Color("235")).Render(" 🛑 CONFIRM SHUTDOWN "),
 		)
 		confirmCard.WriteString("\n\n")
 		confirmCard.WriteString(lipgloss.NewStyle().Bold(true).Render("Stop workstation on exit?"))

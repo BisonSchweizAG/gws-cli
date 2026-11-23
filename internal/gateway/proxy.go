@@ -99,11 +99,11 @@ func noProxyWarning(path string) []string {
 	sep := "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	return []string{
 		sep,
-		"⚠️  WARNING: Gateway proxy is NOT set to No proxy",
-		"⚠️  Tunnel connections may fail behind a proxy.",
+		"🚨  WARNING: Gateway proxy is NOT set to No proxy",
+		"🚨  Tunnel connections may fail behind a proxy.",
 		"📄 Settings: " + path,
 		"💡 Run `gws jetbrains-gateway` and restart Gateway.",
-		"💡 Or set No proxy in Gateway Settings ⚙.",
+		"💡 Or set No proxy in Gateway Settings.",
 		sep,
 	}
 }

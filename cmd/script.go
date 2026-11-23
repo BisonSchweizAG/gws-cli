@@ -104,7 +104,7 @@ func handleSSHConfigInclude(cmd *cobra.Command) error {
 	}
 	if !present {
 		cmd.PrintErrf(
-			"⚠️  %s does not include %q, generated snippets are ignored by ssh. Run with --update-ssh-config to add it.\n",
+			"🚨 %s does not include %q, generated snippets are ignored by ssh. Run with --update-ssh-config to add it.\n",
 			sshConfigPath,
 			script.SSHConfigIncludeDirective,
 		)
